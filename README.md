@@ -2,7 +2,7 @@
 
 **English** | [中文](README.zh-CN.md)
 
-Append a **pure-Java mod manager UI** to your own Firefight (交战) Android APK:
+Append a **pure-Java mod manager UI** to your own Firefight Android APK:
 game logic is untouched, the package name and signature stay the same, and saves,
 the mod directory and permissions are shared with the game.
 
@@ -65,6 +65,11 @@ Everything published on GitHub is written in **English**: the repository descrip
 commit messages, Pull Request titles and bodies, and issue text. Source comments and
 script output are English too. Only the documents have a Chinese version, in
 `docs/zh-CN/`, and `README.zh-CN.md`.
+
+The only Chinese and Japanese left in the English tree is translation **data**, which has to
+stay verbatim: the translation tables in `core/tools/l10n_*.py`, the `自定义地图` /
+`カスタムマップ` patterns in `verify_apk.ps1` (they match strings inside the built package),
+the `name_zh` field of the sample mod, and the Chinese versions of the documents.
 
 ## Links
 
