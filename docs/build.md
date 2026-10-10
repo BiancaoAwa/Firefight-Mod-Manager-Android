@@ -28,11 +28,14 @@ pwsh -File core/tools/prepare_work.ps1 -GameApk <your Firefight APK> [-Force] [-
 # build
 pwsh -File core/tools/build.ps1 [-JdkHome <dir>] [-AndroidSdk <dir>] [-ApktoolJar <jar>]
                                 [-Python <exe>] [-Keystore <file>] [-KsPass <pw>]
-                                [-KeyAlias <name>] [-KeyPass <pw>] [-OutName <name>] [-NoSign]
+                                [-KeyAlias <name>] [-KeyPass <pw>] [-OutDir <dir>] [-OutName <name>] [-NoSign]
 
 # verify
 pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk <dir>] [-Python <exe>]
 ```
+
+The signed APK is written to `out/` inside the repository by default (git-ignored);
+pass `-OutDir <dir>` to put it somewhere else.
 
 ## 2. How the toolchain is located
 
