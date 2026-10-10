@@ -52,6 +52,12 @@ docs/                 # 文档
 | [docs/project-layout.md](docs/zh-CN/project-layout.md) | 目录约定与「哪些东西不该进仓库」 |
 | [docs/history.md](docs/zh-CN/history.md) | 开发过程记录：每一轮改了什么、踩了什么坑 |
 
+## 仓库约定
+
+发到 GitHub 上的一切都用**英文**写：仓库简介、提交信息（commit message）、Pull Request 的
+标题与正文、Issue 正文。源码注释和脚本输出也是英文。只有文档有中文版，放在
+`docs/zh-CN/`，以及 `README.zh-CN.md`。
+
 ## 链接
 
 | 项目 | 地址 |

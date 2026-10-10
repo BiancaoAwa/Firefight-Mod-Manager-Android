@@ -59,6 +59,13 @@ The worktree, build artifacts, logs and framework file are never committed, see
 
 Chinese versions of every document live in [docs/zh-CN/](docs/zh-CN/).
 
+## Repository conventions
+
+Everything published on GitHub is written in **English**: the repository description,
+commit messages, Pull Request titles and bodies, and issue text. Source comments and
+script output are English too. Only the documents have a Chinese version, in
+`docs/zh-CN/`, and `README.zh-CN.md`.
+
 ## Links
 
 | Item | Address |
