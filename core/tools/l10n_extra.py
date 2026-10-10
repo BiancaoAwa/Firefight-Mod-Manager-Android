@@ -1,17 +1,10 @@
-# -*- coding: utf-8 -*-
-"""本地化增量键表（第 2 轮反馈新增：语言切换 / 自定义地图 / 合并后的主菜单）。
-
-单独放一个文件，避免改动 79KB 的 l10n_data.py；gen_l10n.py 会把它合并进 EN / T。
-键必须在 EN_EXTRA 里全部出现（gen_l10n.py 会校验 Java 用到的键有没有定义）。
-"""
+"""Round-2 translation data (language switch, custom maps, merged main menu)."""
 
 EN_EXTRA = [
-    # Requirements 3 and 5: main menu + the merged mod manager
     ("menu_maps", "Custom maps"),
     ("pack_browse", "[ Browse files ]"),
     ("msg_packs_hint", "Mod folder = "),
 
-    # Requirement 2: language switch
     ("btn_lang", "Language"),
     ("btn_back", "[ Back ]"),
     ("title_lang", "Interface language"),
@@ -19,11 +12,9 @@ EN_EXTRA = [
     ("about_lang_now", "Interface language"),
     ("msg_lang_hint", "Pick the language used by this manager. The game itself is unchanged."),
 
-    # Requirement 1: new buttons on the About page
     ("about_site_btn", "Open game website"),
     ("about_github_btn", "Open author GitHub"),
 
-    # Requirement 7: custom maps
     ("title_maps", "Custom maps"),
     ("menu_map_dir", "Map directory"),
     ("about_mapdir", "Map directory"),

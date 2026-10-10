@@ -11,8 +11,8 @@ into `classes4.dex` and appended to the game APK. All classes live in
 | `MyGame` | ~170 lines | **The new launcher Activity**, `extends SDLActivity`. `onCreate` calls `super` first (the game initialises as usual) and then shows the prompt: "Yes" opens `ModManagerActivity`, "No" or the end of the `PROMPT_SECONDS = 15` countdown continues into the game. It also provides `rootOfStatic(Context)` -- the single "sandbox root" entry point of the whole project |
 | `ModManagerActivity` | ~860 lines | The main manager screen (three tabs + title bar + stats line) and the click dispatch centre for every button |
 | `ModImportActivity` | ~120 lines | A transparent/dialog-style Activity that receives `VIEW`/`SEND` of `application/zip`, hands the mod package to `ModImporter` and finishes |
-| `ModImporter` | ~885 lines | All file logic for mods: enumerate slots, read names, enable/disable (moving between `Mod/` and `Mod-disabled/`), import (built-in assets / external zip / single-top-directory stripping), backups and metadata |
-| `MapImporter` | ~690 lines | Custom map import and registration: unpack into `Custom Maps/<CODE>/`, append `<CODE>` to `CustomMapCodeNames.txt`, read `<name>` from `-scenarios`, page the list |
+| `ModImporter` | ~1000 lines | All file logic for mods: `Mod/` holds the raw files of the one active mod (no `<id>/` level), inactive mods live in `Mod-disabled/<id>/` and the active id is recorded in `Mod-disabled/.ffm-enabled`; enabling a mod moves the previous one back into the library (one at a time). Also import (built-in assets / external zip / single-top-directory stripping), backups and metadata |
+| `MapImporter` | ~740 lines | Custom maps: unpack into `Custom Maps/<CODE>/`, register `<CODE>` in `CustomMapCodeNames.txt` (listed = enabled, deleting the line = disabled), list maps in the order of that file with `moveCode()` for up/down, read `<name>` from `-scenarios`, page the list |
 | `Ui` | ~205 lines | Widget factory and sizing helpers: `column/row/title/subtitle/action/headerAction/tabButton/divider/weight/fill/pad/dp/...`, all colours have fallbacks (a missing theme colour cannot crash it) |
 | `L10n` | ~230 lines | Language resolution: maps the system locale to one of 28 languages, `t()` reads from the generated `ffm_strings.xml` and falls back to English/the key name |
 | `LogStore` | ~230 lines | Diagnostics: appends events to `<Download>/Firefight-Mod-Manager/<package>/`, keeping the newest `MAX_FILES = 10`; "About -> Copy diagnostics" copies its contents |
@@ -66,15 +66,22 @@ well; no `RecyclerView` is used (zero dependencies).
 
 Each row on the Mods page: name (the `<name>` of `mod.txt`, `NA` if unreadable) + size; slot 0
 shows "currently enabled"; the buttons are enable/disable + delete (deleting asks for
-confirmation). The last item of the list is "Import mod". The last item on the Maps page is
-"Import map", with previous/next page buttons at the bottom.
+confirmation). The last item of the list is "Import mod", preceded by a line saying that only
+one mod can be active at a time.
+
+Each row on the Maps page: code + name + state (enabled / disabled / folder missing) + size,
+with enable/disable + up + down buttons; the last item is "Import map", with previous/next page
+buttons at the bottom and a line saying that this order is the order in the game.
+
+After a mod or map change the manager offers a "restart required" dialog whose "Restart now"
+button brings `MyGame` back up.
 
 ## 3. Localisation
 
 * String keys all use the `ffm_` prefix; manager UI keys use `ffm_mm_*`.
-* The three Python data tables `core/tools/l10n_data.py` / `l10n_extra.py` /
-  `l10n_round3.py` are the **only** source of strings; `core/tools/gen_l10n.py` merges them
-  at build time and writes `core/work/v35/res/values*/ffm_strings.xml` (28 languages plus
+* The four Python data tables `core/tools/l10n_data.py` / `l10n_extra.py` /
+  `l10n_round3.py` / `l10n_round4.py` are the **only** source of strings; `core/tools/gen_l10n.py`
+  merges them at build time and writes `core/work/v35/res/values*/ffm_strings.xml` (28 languages plus
   the default English).
 * `gen_l10n.py` scans every `t("key")` in `core/src/**/*.java` and checks that each key is
   defined and that no language has extra keys; a missing key fails the build.

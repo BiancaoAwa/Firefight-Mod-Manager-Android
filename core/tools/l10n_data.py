@@ -1,12 +1,6 @@
-# -*- coding: utf-8 -*-
-"""本地化文案数据（需求①：各类本地化文本）。
+"""First-round translation data: EN is the full key list, T[locale] only holds the keys it
+overrides. gen_l10n.py turns this into resource files."""
 
-只放数据，不放逻辑；生成器见 gen_l10n.py。
-EN 是完整的键表（与 Java 里 t("key", "...") 的 fallback 一一对应）。
-T[locale] 只需给出要覆盖的键，缺的键 Android 会自动回落到 values/（英文）。
-"""
-
-# key -> English source text (the key table must cover every t("...") call in the Java code)
 EN = [
     ("title_menu", "Firefight Mod Manager"),
     ("menu_mods", "Mod manager"),
@@ -920,7 +914,6 @@ T["it"] = {
     "msg_log_saved": "Registro salvato: ",
 }
 
-# ---- Tier 2: core UI strings (the remaining keys fall back to English) ----
 T["pl"] = {
     "title_menu": "Menedżer modów Firefight",
     "menu_mods": "Menedżer modów",

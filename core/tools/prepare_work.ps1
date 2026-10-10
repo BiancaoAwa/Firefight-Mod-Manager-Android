@@ -1,16 +1,4 @@
-# Firefight Mod Manager -- prepare the decoded worktree
-#
-# Decode "a Firefight APK that already carries your mods" into core/work/v35 and apply the worktree
-# changes the manager needs (two activities in AndroidManifest, the sample mod, retiring the old MyGame.smali).
-#
-# Usage (from the repository root):
-#   pwsh -File core/tools/prepare_work.ps1 -GameApk "D:\path\Sean's 13.2.0_Mod_v35(1).apk"
-#   pwsh -File core/tools/prepare_work.ps1 -GameApk <apk> -Force     # overwrite an existing worktree
-#
-# Then run core/tools/build.ps1 to produce the APK.
-#
-# Why a modded APK: the manager and the game are one package with one signature, so the manager rides
-# on your own mod package and the player's saves and mod directory stay inside the same app sandbox. See docs/deploy.md.
+# Decode the game APK into core/work/v35 and patch it.
 
 [CmdletBinding()]
 param(

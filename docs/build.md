@@ -91,8 +91,8 @@ The `verify_apk.ps1` gates:
 
 ## 5. Changing strings / adding a language
 
-1. Add the key and its translations in `core/tools/l10n_round3.py` (or `l10n_extra.py` /
-   `l10n_data.py`);
+1. Add the key and its translations in `core/tools/l10n_round4.py` (the newest round; older keys
+   live in `l10n_round3.py` / `l10n_extra.py` / `l10n_data.py`);
 2. Reference it from Java with `t("ffm_mm_your_key")`;
 3. Run `build.ps1` -- `gen_l10n.py` validates both "used by Java but undefined" and
    "defined but misspelled" keys, and aborts if anything is wrong.

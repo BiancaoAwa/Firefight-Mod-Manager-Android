@@ -1,15 +1,6 @@
-# -*- coding: utf-8 -*-
-"""第 3 轮（真界面重做）新增文案键。
-
-单独一个文件，避免动 79KB 的 l10n_data.py 与第 2 轮的 l10n_extra.py。
-gen_l10n.py 会把 EN_R3 追加进 EN、把 T_R3 合并进 T（缺的键自动回落英文）。
-
-约定：所有键名必须以 mm_ 开头，方便和前面两轮区分；不要在文案里用 %s 之类的
-占位符（Java 侧统一做「标签 + 值」拼接），这样各语种不用管参数顺序。
-"""
+"""Round-3 translation data (the manager UI rework)."""
 
 EN_R3 = [
-    # ---- launch prompt (spec 1) ----
     ("mm_prompt_title", "Firefight Mod Manager"),
     ("mm_prompt_msg", "Use the mod manager?"),
     ("mm_prompt_auto", "closes in "),
@@ -17,7 +8,6 @@ EN_R3 = [
     ("mm_yes", "Yes"),
     ("mm_no", "No"),
 
-    # ---- shared manager title / tabs ----
     ("mm_title", "Firefight Mod Manager"),
     ("mm_tab_mods", "Mods"),
     ("mm_tab_maps", "Maps"),
@@ -30,7 +20,6 @@ EN_R3 = [
     ("mm_root_unavailable", "Storage folder unavailable (grant \"All files access\")"),
     ("mm_op_failed", "Operation failed"),
 
-    # ---- Mods page (spec 2) ----
     ("mm_mods_count", "Installed mods: "),
     ("mm_mods_total", "Total size: "),
     ("mm_mods_slots_note", "Only the first 5 mods are shown."),
@@ -52,7 +41,6 @@ EN_R3 = [
     ("mm_import_fail", "Import failed"),
     ("mm_import_cancel", "Cancelled"),
 
-    # ---- Maps page (spec 3) ----
     ("mm_maps_count", "Installed maps: "),
     ("mm_maps_total", "Total size: "),
     ("mm_page", "Page "),
@@ -70,14 +58,12 @@ EN_R3 = [
     ("mm_map_state", "State: "),
     ("mm_map_imported", "Map imported: "),
 
-    # ---- delete confirmation ----
     ("mm_del_title", "Confirm delete"),
     ("mm_del_mod", "Delete this mod and all of its files?"),
     ("mm_del_map", "Delete this map and all of its files?"),
     ("mm_deleted", "Deleted"),
     ("mm_del_failed", "Delete failed"),
 
-    # ---- About page (spec 4) ----
     ("mm_about_meta", "Manager information"),
     ("mm_about_site", "Game official website"),
     ("mm_about_repo", "GitHub repository"),

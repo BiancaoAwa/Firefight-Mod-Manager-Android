@@ -1,30 +1,7 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""Apply the worktree changes the manager needs to the decoded work/v35.
+"""Patch a freshly decoded game tree: add the two manager activities to AndroidManifest.xml,
+ship the example mod under assets/Mod, remove the old MyGame.smali. Idempotent.
 
-Designed to be idempotent: running it twice does not insert duplicates, and existing files are skipped.
-
-It does three things:
-
-1. Insert two Activities into `AndroidManifest.xml`:
-   - `ModManagerActivity`: the manager UI (opened by the launch prompt / share entry point)
-   - `ModImportActivity`: receives VIEW / SEND `application/zip`, used to share a mod zip in from a file
-     manager or another app
-   The position is right after the game's own `MyGame` Activity (no existing game node is touched).
-   No permission needs to be added: the game itself already declares `MANAGE_EXTERNAL_STORAGE` and
-   `WRITE_EXTERNAL_STORAGE`.
-
-2. Sample `assets/Mod/` data: `core/assets/Mod` is copied into the worktree so the import flow can be
-   tried directly on a device. **Delete `core/assets/Mod` before running if you do not want them.**
-
-3. Delete the old smali `smali*/com/windowsgames/firefight/MyGame.smali`: the manager takes over the
-   game launch flow with a new class of the same package and name, so the old one must give way (backed up to `core/backup/` first).
-
-Usage::
-
-    python core/tools/patch_worktree.py            # work/v35 by default
-    python core/tools/patch_worktree.py -w core/work/v35 -c core
-"""
+Usage: python patch_worktree.py -w <work/v35> -c <core>"""
 import argparse
 import io
 import os
@@ -60,16 +37,13 @@ MANAGER_ACTIVITIES = (
 
 MYGAME = 'android:name="com.windowsgames.firefight.MyGame"'
 
-
 def read(path):
     with io.open(path, encoding="utf-8") as fh:
         return fh.read()
 
-
 def write(path, text):
     with io.open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(text)
-
 
 def patch_manifest(work, dry):
     path = os.path.join(work, "AndroidManifest.xml")
@@ -89,7 +63,6 @@ def patch_manifest(work, dry):
         write(path, text[:end] + MANAGER_ACTIVITIES + text[end:])
     return "manifest: inserted ModManagerActivity + ModImportActivity"
 
-
 def patch_assets(core, work, dry):
     src = os.path.join(core, "assets", "Mod")
     if not os.path.isdir(src):
@@ -102,7 +75,6 @@ def patch_assets(core, work, dry):
         shutil.copytree(src, dst)
     return "assets: copied the sample mods to assets/Mod"
 
-
 def find_old_smali(work):
     """Find MyGame.smali under every dex directory (smali / smali_classes2 / ...) in the worktree."""
     hits = []
@@ -111,7 +83,6 @@ def find_old_smali(work):
         if rel.split("/")[0].startswith("smali") and "MyGame.smali" in names:
             hits.append(os.path.join(base, "MyGame.smali"))
     return hits
-
 
 def drop_old_smali(core, work, dry):
     hits = find_old_smali(work)
@@ -125,7 +96,6 @@ def drop_old_smali(core, work, dry):
             os.remove(src)
         print("    - removed %s" % os.path.relpath(src, work).replace("\\", "/"))
     return "smali: backed up and deleted %d MyGame.smali (backup at core/backup/MyGame.smali.orig)" % len(hits)
-
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
@@ -144,7 +114,6 @@ def main():
     print("  - " + drop_old_smali(core, work, args.dry_run))
     if args.dry_run:
         print("(dry-run, nothing written)")
-
 
 if __name__ == "__main__":
     main()

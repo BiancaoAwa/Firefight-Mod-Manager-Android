@@ -11,23 +11,18 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * Round 3: lightweight widget factory for the full-screen UI.
- *
- * Everything is built in code with no new res/layout, so the build chain only needs apktool to compile
- * values resources, without aapt2 layout compilation: one failure point less. All colors come from theme attributes, so light and dark themes both stay readable.
+ * Widget factory used to build every manager view in code; no XML layout is added to the game.
  */
+
 final class Ui {
 
     private Ui() {
     }
 
-    // ------------------------------------------------------------ sizes / colors
-
     static int dp(Context c, float v) {
         return (int) (v * c.getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    /** Resolve a theme color attribute, falling back when it is unavailable. */
     static int color(Context c, int attr, int fallback) {
         try {
             TypedValue tv = new TypedValue();
@@ -74,8 +69,6 @@ final class Ui {
         return g;
     }
 
-    // ------------------------------------------------------------ containers
-
     static LinearLayout column(Context c) {
         LinearLayout l = new LinearLayout(c);
         l.setOrientation(LinearLayout.VERTICAL);
@@ -89,7 +82,6 @@ final class Ui {
         return l;
     }
 
-    /** Card container: rounded background + padding. */
     static LinearLayout card(Context c) {
         LinearLayout l = column(c);
         l.setBackground(cardBg(c));
@@ -102,8 +94,6 @@ final class Ui {
         v.setPadding(dp(c, l), dp(c, t), dp(c, r), dp(c, b));
     }
 
-
-
     static LinearLayout.LayoutParams fill() {
         return new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -112,8 +102,6 @@ final class Ui {
     static LinearLayout.LayoutParams weight(float w) {
         return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, w);
     }
-
-    // ------------------------------------------------------------ text
 
     static TextView text(Context c, String s, float sp, int color, boolean bold) {
         TextView v = new TextView(c);
@@ -147,9 +135,6 @@ final class Ui {
         return text(c, s, 12f, secondary(c), false);
     }
 
-
-    // ------------------------------------------------------------ buttons
-
     static Button button(Context c, String s) {
         Button b = new Button(c);
         b.setText(s == null ? "" : s);
@@ -173,7 +158,6 @@ final class Ui {
         return b;
     }
 
-    /** Compact button on the right of the title bar (language / back): no minimum width, so the title is not squeezed out. */
     static Button headerAction(Context c, String s) {
         Button b = action(c, s);
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
@@ -183,8 +167,6 @@ final class Ui {
         b.setPadding(dp(c, 8), dp(c, 2), dp(c, 8), dp(c, 2));
         return b;
     }
-
-    // ------------------------------------------------------------ divider
 
     static View divider(Context c) {
         View v = new View(c);

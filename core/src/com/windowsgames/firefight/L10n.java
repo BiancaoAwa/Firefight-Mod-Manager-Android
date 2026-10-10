@@ -8,29 +8,22 @@ import android.content.res.Resources;
 import java.util.Locale;
 
 /**
- * Localized string lookup: resolve ffm_<key> from the APK resources res/values[-xx]/strings.xml first,
- * and fall back to the English constant supplied by the caller. Adding a language therefore only needs a new resource file, no Java change.
- *
- * Requirement 2: with an English system locale the UI is English, and the user wants to pick a language manually.
- * This uses an in-app override: the preference is stored in SharedPreferences and lookups go through a
- * resource context built by createConfigurationContext(). **SDL's Context is never touched**
- * (a hard-won lesson from the original README: handing a wrapped Context to SDL stops the game from starting).
- * It also deliberately avoids LocaleManager.setApplicationLocales(), because that recreates the Activity
- * = restarts the game.
+ * Language handling for the manager. The chosen tag lives in SharedPreferences (empty = follow
+ * the system) and every ffm_* string is read from the app's own resources.
+ * Not implemented: per-key overrides.
  */
+
 public final class L10n {
 
     private static final String PREFS = "ffm_prefs";
     private static final String KEY_LANG = "lang";
 
-    /** Language tag (Android resource-directory style); "" = follow the system. */
     public static final String[] TAGS = {
             "", "en", "zh-rCN", "zh-rTW", "ja", "ko", "ru", "de", "fr", "es", "it",
             "pt-rBR", "ar", "tr", "pl", "nl", "uk", "vi", "th", "hi", "id", "ms",
             "cs", "el", "he", "fa", "bg", "hu", "ro", "sv",
     };
 
-    /** Language endonyms (never translated, readable in any locale). One-to-one with TAGS. */
     public static final String[] LABELS = {
             "\u8DDF\u968F\u7CFB\u7EDF / System",
             "English",
@@ -64,7 +57,6 @@ public final class L10n {
             "Svenska",
     };
 
-    /** Package name inside the resource table after an apktool rebuild (measured value), used as the last-resort candidate. */
     private static final String RES_PKG = "com.windowsgames.firefight";
 
     private static String overrideTag = "";
@@ -74,7 +66,6 @@ public final class L10n {
     private L10n() {
     }
 
-    /** Read the preference once at startup. */
     public static void init(Context c) {
         if (c == null) {
             return;
@@ -90,12 +81,10 @@ public final class L10n {
         }
     }
 
-    /** Currently overridden language tag; "" means follow the system. */
     public static String tag() {
         return overrideTag == null ? "" : overrideTag;
     }
 
-    /** Set the language; also persists it so the choice survives the next start. */
     public static void set(Context c, String tag) {
         overrideTag = tag == null ? "" : tag;
         overrideCtx = null;
@@ -124,7 +113,6 @@ public final class L10n {
         }
     }
 
-    /** "zh-rCN" / "pt-rBR" / "ja" -> Locale. */
     public static Locale toLocale(String tag) {
         if (tag == null || tag.length() == 0) {
             return Locale.getDefault();
@@ -163,8 +151,7 @@ public final class L10n {
             int id = lookup(r, "ffm_" + key, c);
             if (id != 0) {
                 String s = r.getString(id);
-                // An empty string is a legitimate translation (e.g. the countdown splice key mm_prompt_auto is empty in Chinese);
-                // it must not be treated as "not found", or lookups would fall back to the key name.
+
                 if (s != null) {
                     return s;
                 }
@@ -174,12 +161,6 @@ public final class L10n {
         return null;
     }
 
-    /**
-     * Inside a resources.arsc rebuilt by apktool the resource package name is not necessarily the applicationId
-     * (measured here: the resource package is the original game package com.windowsgames.firefight, while the applicationId is
-     * com.windowsgames.firefight.mod) -- looking names up by applicationId always returns 0.
-     * So try every candidate package name and cache the first one that works.
-     */
     private static int lookup(Resources r, String name, Context c) {
         if (goodPkg != null) {
             int id = id(r, name, goodPkg);
@@ -201,7 +182,7 @@ public final class L10n {
 
     private static int id(Resources r, String name, String pkg) {
         try {
-            // When pkg == null, AssetManager2 walks every package of the resource table.
+
             return r.getIdentifier(name, "string", pkg);
         } catch (Throwable ignored) {
             return 0;
@@ -216,7 +197,6 @@ public final class L10n {
         }
     }
 
-    /** Diagnostic helper: confirm on a real device whether ffm_ resources can be resolved at all. */
     public static String probe(Context c) {
         StringBuilder sb = new StringBuilder();
         sb.append("lang tag: ").append(tag().length() == 0 ? "(system)" : tag()).append('\n');

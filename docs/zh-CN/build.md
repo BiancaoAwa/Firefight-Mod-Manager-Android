@@ -89,7 +89,8 @@ pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk
 
 ## 5. 改文案 / 加语言的流程
 
-1. 在 `core/tools/l10n_round3.py`（或 `l10n_extra.py` / `l10n_data.py`）里加键和译文；
+1. 在 `core/tools/l10n_round4.py`（最新一轮；更早的键在 `l10n_round3.py` / `l10n_extra.py` /
+   `l10n_data.py`）里加键和译文；
 2. 在 Java 里用 `t("ffm_mm_你的键")` 引用；
 3. 跑 `build.ps1` —— `gen_l10n.py` 会校验「Java 用到但没定义」和「定义了却拼错」的键，
    不通过就中止。
