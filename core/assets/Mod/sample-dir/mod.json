@@ -1,0 +1,9 @@
+﻿{
+  "id": "example-mod",
+  "name": "Example Mod",
+  "name_zh": "示例模组",
+  "version": "1.0.0",
+  "gameVersion": "13.2.0",
+  "type": "data",
+  "description": "Built-in sample mod shipped in assets/Mod. Safe to install or delete; it only drops a text file."
+}
