@@ -13,9 +13,9 @@ import android.widget.Toast;
 import java.io.InputStream;
 
 /**
- * 轻量导入入口（需求③「其他的进入退出方法」）：
- * 从文件管理器 / 分享菜单用「打开方式」选中 .zip / .ffmod 模组包时，
- * 直接进入导入确认，不启动 SDL 游戏本体。
+ * Lightweight import entry point (requirement 3, "other ways in and out"):
+ * when the user selects a .zip / .ffmod mod package in a file manager or the share menu via "Open with",
+ * go straight to the import confirmation without starting the SDL game itself.
  */
 public class ModImportActivity extends Activity implements DialogInterface.OnClickListener {
 

@@ -8,29 +8,29 @@ import android.content.res.Resources;
 import java.util.Locale;
 
 /**
- * 本地化取词：优先从 APK 资源 res/values[-xx]/strings.xml 里按名字取 ffm_<key>，
- * 取不到时回退到调用方给的英文常量。这样新增语种只需要加资源文件，不用改 Java。
+ * Localized string lookup: resolve ffm_<key> from the APK resources res/values[-xx]/strings.xml first,
+ * and fall back to the English constant supplied by the caller. Adding a language therefore only needs a new resource file, no Java change.
  *
- * 需求②：系统语言是英文时界面就是英文，用户希望能手动挑语言。
- * 这里用「应用内覆盖」的办法：把偏好存进 SharedPreferences，取词时改用
- * createConfigurationContext() 生成的资源上下文。**不碰 SDL 的 Context**
- * （原版 README 的血泪坑：把包装 Context 交给 SDL 会让游戏起不来）。
- * 也刻意不调用 LocaleManager.setApplicationLocales()，因为那会触发 Activity 重建
- * = 游戏重启。
+ * Requirement 2: with an English system locale the UI is English, and the user wants to pick a language manually.
+ * This uses an in-app override: the preference is stored in SharedPreferences and lookups go through a
+ * resource context built by createConfigurationContext(). **SDL's Context is never touched**
+ * (a hard-won lesson from the original README: handing a wrapped Context to SDL stops the game from starting).
+ * It also deliberately avoids LocaleManager.setApplicationLocales(), because that recreates the Activity
+ * = restarts the game.
  */
 public final class L10n {
 
     private static final String PREFS = "ffm_prefs";
     private static final String KEY_LANG = "lang";
 
-    /** 语言标签（Android 资源目录风格），"" = 跟随系统。 */
+    /** Language tag (Android resource-directory style); "" = follow the system. */
     public static final String[] TAGS = {
             "", "en", "zh-rCN", "zh-rTW", "ja", "ko", "ru", "de", "fr", "es", "it",
             "pt-rBR", "ar", "tr", "pl", "nl", "uk", "vi", "th", "hi", "id", "ms",
             "cs", "el", "he", "fa", "bg", "hu", "ro", "sv",
     };
 
-    /** 语言自称（不翻译，任何语言下都看得懂）。与 TAGS 一一对应。 */
+    /** Language endonyms (never translated, readable in any locale). One-to-one with TAGS. */
     public static final String[] LABELS = {
             "\u8DDF\u968F\u7CFB\u7EDF / System",
             "English",
@@ -64,7 +64,7 @@ public final class L10n {
             "Svenska",
     };
 
-    /** apktool 重建后资源表里的包名（实测值），作为最后的兜底候选。 */
+    /** Package name inside the resource table after an apktool rebuild (measured value), used as the last-resort candidate. */
     private static final String RES_PKG = "com.windowsgames.firefight";
 
     private static String overrideTag = "";
@@ -74,7 +74,7 @@ public final class L10n {
     private L10n() {
     }
 
-    /** 启动时读一次偏好。 */
+    /** Read the preference once at startup. */
     public static void init(Context c) {
         if (c == null) {
             return;
@@ -90,12 +90,12 @@ public final class L10n {
         }
     }
 
-    /** 当前覆盖的语言标签，"" 表示跟随系统。 */
+    /** Currently overridden language tag; "" means follow the system. */
     public static String tag() {
         return overrideTag == null ? "" : overrideTag;
     }
 
-    /** 设置语言；同时落盘，下次启动继续生效。 */
+    /** Set the language; also persists it so the choice survives the next start. */
     public static void set(Context c, String tag) {
         overrideTag = tag == null ? "" : tag;
         overrideCtx = null;
@@ -124,7 +124,7 @@ public final class L10n {
         }
     }
 
-    /** "zh-rCN" / "pt-rBR" / "ja" → Locale。 */
+    /** "zh-rCN" / "pt-rBR" / "ja" -> Locale. */
     public static Locale toLocale(String tag) {
         if (tag == null || tag.length() == 0) {
             return Locale.getDefault();
@@ -163,8 +163,8 @@ public final class L10n {
             int id = lookup(r, "ffm_" + key, c);
             if (id != 0) {
                 String s = r.getString(id);
-                // 空字符串是合法译文（例如倒计时拼接键 mm_prompt_auto 在中文里就是空），
-                // 不能当成「没找到」，否则会回落到键名。
+                // An empty string is a legitimate translation (e.g. the countdown splice key mm_prompt_auto is empty in Chinese);
+                // it must not be treated as "not found", or lookups would fall back to the key name.
                 if (s != null) {
                     return s;
                 }
@@ -175,10 +175,10 @@ public final class L10n {
     }
 
     /**
-     * apktool 重建出来的 resources.arsc 里，资源包的包名不一定是 applicationId
-     * （本项目实测资源包名是原版游戏包名 com.windowsgames.firefight，而 applicationId 是
-     * com.windowsgames.firefight.mod）——按 applicationId 查名字会永远返回 0。
-     * 所以这里逐个候选包名试，并把第一次成功的那个缓存下来。
+     * Inside a resources.arsc rebuilt by apktool the resource package name is not necessarily the applicationId
+     * (measured here: the resource package is the original game package com.windowsgames.firefight, while the applicationId is
+     * com.windowsgames.firefight.mod) -- looking names up by applicationId always returns 0.
+     * So try every candidate package name and cache the first one that works.
      */
     private static int lookup(Resources r, String name, Context c) {
         if (goodPkg != null) {
@@ -201,7 +201,7 @@ public final class L10n {
 
     private static int id(Resources r, String name, String pkg) {
         try {
-            // pkg == null 时 AssetManager2 会遍历资源表里的所有包。
+            // When pkg == null, AssetManager2 walks every package of the resource table.
             return r.getIdentifier(name, "string", pkg);
         } catch (Throwable ignored) {
             return 0;
@@ -216,7 +216,7 @@ public final class L10n {
         }
     }
 
-    /** 诊断用：在真机上确认 ffm_ 资源到底能不能被找到。 */
+    /** Diagnostic helper: confirm on a real device whether ffm_ resources can be resolved at all. */
     public static String probe(Context c) {
         StringBuilder sb = new StringBuilder();
         sb.append("lang tag: ").append(tag().length() == 0 ? "(system)" : tag()).append('\n');

@@ -6,7 +6,7 @@ EN 是完整的键表（与 Java 里 t("key", "...") 的 fallback 一一对应�
 T[locale] 只需给出要覆盖的键，缺的键 Android 会自动回落到 values/（英文）。
 """
 
-# 键 -> 英文原文（键表必须覆盖 Java 代码里所有 t("...") 调用）
+# key -> English source text (the key table must cover every t("...") call in the Java code)
 EN = [
     ("title_menu", "Firefight Mod Manager"),
     ("menu_mods", "Mod manager"),
@@ -920,7 +920,7 @@ T["it"] = {
     "msg_log_saved": "Registro salvato: ",
 }
 
-# ---- 第二梯队：核心界面文案（其余键回落到英文） ----
+# ---- Tier 2: core UI strings (the remaining keys fall back to English) ----
 T["pl"] = {
     "title_menu": "Menedżer modów Firefight",
     "menu_mods": "Menedżer modów",

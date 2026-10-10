@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-"""签名 APK 的 zip 层静态校验（MVP 验证 G1/G2/G7）。
+"""Static zip-level verification of a signed APK (MVP gate G1/G2/G7).
 
-用法: python tools/verify_apk.py <apk> [dex-classes.dex]
+Usage: python tools/verify_apk.py <apk> [dex-classes.dex]
 
-检查项：
-  * classes*.dex 条目齐全，且新注入的那一个存在
-  * lib/**/*.so 全部 STORED（extractNativeLibs="false" 的硬要求）
-  * assets/Mod 内置模组包在包里
-  * AndroidManifest.xml / resources.arsc 存在
+Checks:
+  * every classes*.dex entry is present, including the newly injected one
+  * all lib/**/*.so are STORED (a hard requirement of extractNativeLibs="false")
+  * the built-in mod packages under assets/Mod are inside the package
+  * AndroidManifest.xml / resources.arsc exist
 """
 import sys
 import zipfile
@@ -36,14 +36,14 @@ def main():
             i = infos[n]
             print("      %-16s %-8s %d bytes" % (
                 n, "stored" if i.compress_type == 0 else "deflate", i.file_size))
-        check(want_dex in names, "%s 已注入" % want_dex)
-        check(len(dexes) >= 4, "dex 条目数 >= 4（实际 %d）" % len(dexes))
+        check(want_dex in names, "%s injected" % want_dex)
+        check(len(dexes) >= 4, "dex entry count >= 4 (actual %d)" % len(dexes))
 
         print("[native]")
         sos = [n for n in names if n.startswith("lib/") and n.endswith(".so")]
         bad = [n for n in sos if infos[n].compress_type != 0]
-        check(len(sos) > 0, "lib/**/*.so 存在（%d 个）" % len(sos))
-        check(not bad, "所有 .so 都是 STORED（违规 %d 个）" % len(bad))
+        check(len(sos) > 0, "lib/**/*.so present (%d files)" % len(sos))
+        check(not bad, "all .so entries are STORED (%d violations)" % len(bad))
         for n in bad[:10]:
             print("      VIOLATION %s" % n)
 
@@ -51,8 +51,8 @@ def main():
         mods = [n for n in names if n.startswith("assets/Mod/")]
         for n in sorted(mods):
             print("      %s" % n)
-        check(any(n.endswith(".zip") for n in mods), "内置 zip 模组包存在")
-        check(any(n.endswith("/mod.json") for n in mods), "内置目录模组包(mod.json)存在")
+        check(any(n.endswith(".zip") for n in mods), "built-in zip mod package present")
+        check(any(n.endswith("/mod.json") for n in mods), "built-in directory mod package (mod.json) present")
 
         print("[core]")
         check("AndroidManifest.xml" in names, "AndroidManifest.xml")

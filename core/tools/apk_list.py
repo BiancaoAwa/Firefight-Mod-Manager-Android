@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""列出 APK 内的条目（可按关键字过滤），不解压。
+"""List the entries inside an APK (optionally filtered by keyword) without unpacking it.
 
-用法: python tools/apk_list.py <apk> [子串1 子串2 ...]
+Usage: python tools/apk_list.py <apk> [substring1 substring2 ...]
 """
 import sys
 import zipfile
@@ -14,7 +14,7 @@ def main():
         names = z.namelist()
         hits = [n for n in names
                 if not pats or any(p in n.lower() for p in pats)]
-        print("总条目 %d，命中 %d" % (len(names), len(hits)))
+        print("total entries %d, matches %d" % (len(names), len(hits)))
         for n in sorted(hits):
             print("  %s" % n)
         if not pats:
@@ -22,7 +22,7 @@ def main():
             for n in names:
                 key = n.split("/")[0]
                 top[key] = top.get(key, 0) + 1
-            print("\n顶层分布:")
+            print("\nTop-level distribution:")
             for k, v in sorted(top.items(), key=lambda kv: -kv[1])[:30]:
                 print("  %-40s %d" % (k, v))
 

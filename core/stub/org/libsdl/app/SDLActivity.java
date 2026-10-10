@@ -5,10 +5,10 @@ import android.content.Context;
 import android.os.Bundle;
 
 /**
- * 仅编译期使用的桩类：不参与 dex 打包（只出现在 javac 的 -cp 上）。
- * 运行时由 APK 内原有的 org.libsdl.app.SDLActivity 提供。
- * 这里声明的方法必须与真实 SDLActivity 的签名完全一致，
- * 且本类只声明 MyGame.java 实际会调用到的成员。
+ * Compile-time-only stub: it is never packaged into the dex (it only appears on javac's -cp).
+ * At runtime the original org.libsdl.app.SDLActivity of the APK provides the real class.
+ * The methods declared here must match the real SDLActivity signatures exactly,
+ * and this class declares only the members that MyGame.java actually calls.
  */
 public class SDLActivity extends Activity {
 

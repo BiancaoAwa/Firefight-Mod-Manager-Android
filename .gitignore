@@ -1,4 +1,4 @@
-# 生成物（见 docs/project-layout.md）
+# generated artifacts (see docs/project-layout.md)
 core/work/
 core/build/
 core/framework/
@@ -9,7 +9,7 @@ out/
 work-fresh/
 shots/
 
-# 本地产物 / 临时文件
+# local artifacts / temporary files
 *.local
 *.tmp
 _scratch/

@@ -28,16 +28,16 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 第 3 轮：模组管理器整屏界面（三页签）。
+ * Round 3: full-screen mod manager UI (three tabs).
  *
- * 规格（用户 m01133）：
- *   - 模组管理：已装个数 / 总大小；模组0（正在启用的）显示 禁用 / 删除，模组1–4 显示 启用|禁用 / 删除；
- *     删除要二次确认；最后一项「导入模组」。共用 5 个槽位，多余的模组不显示。
- *   - 地图管理：已装个数 / 总大小；名字读 ****-scenarios.txt 的 &lt;name&gt;，取不到显示 4 位代码；
- *     每页 9 个自动分页；最后一项「地图导入」。
- *   - 关于管理器：元数据 / 官网 / GitHub 仓库 / 作者 GitHub / 哔哩哔哩 / 爱发电 / 邮箱。
+ * Spec (user m01133):
+ *   - Mods: installed count / total size; mod0 (the one currently enabled) shows Disable / Delete, mod1-4 show Enable|Disable / Delete;
+ *     deletion asks for confirmation; the last row is "Import mod". Five slots are shared, extra mods are not shown.
+ *   - Maps: installed count / total size; the name comes from <name> in ****-scenarios.txt, falling back to the 4-character code;
+ *     9 per page with automatic paging; the last row is "Import map".
+ *   - About: metadata / website / GitHub repository / author GitHub / Bilibili / Afdian / e-mail.
  *
- * 全部用代码搭界面，不新增 res/layout —— 构建链只编译 values 资源，少一个失败点。
+ * The whole UI is built in code, with no new res/layout -- the build chain then only compiles values resources, one failure point less.
  */
 public class ModManagerActivity extends Activity implements View.OnClickListener {
 
@@ -99,7 +99,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     private List<ModImporter.Slot> slots = new ArrayList<ModImporter.Slot>();
     private List<MapImporter.MapEntry> maps = new ArrayList<MapImporter.MapEntry>();
 
-    // ------------------------------------------------------------ 生命周期
+    // ------------------------------------------------------------ lifecycle
 
     protected void onCreate(Bundle savedInstanceState) {
         try {
@@ -158,16 +158,16 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    // ------------------------------------------------------------ 骨架
+    // ------------------------------------------------------------ skeleton
 
     private View buildRoot() {
-        // 结构：整屏可滚动的 ScrollView 就是内容视图本身。
+        // Structure: the whole-screen scrollable ScrollView IS the content view itself.
         //
-        // 为什么不是「根 LinearLayout + 滚动区当子项」：真机实测内容容器在首帧被量成
-        // 0 可用高度（ch=0），子项虽然都加进去了却全是 0 高 → 整块空白；手点页签会重建
-        // 子视图、重跑测量，内容就"点出来了"。现在窗口直接给 ScrollView 整屏高（EXACTLY），
-        // ScrollView 以 UNSPECIFIED 高度测量内层 LinearLayout —— 内层与子项只能拿到自然
-        // 高度，容器不会再量成 0。
+        // Why not "root LinearLayout + a scroll area as a child": on a real device the content container
+        // was measured with 0 available height on the first frame (ch=0), so every child that had been added
+        // ended up 0 high -> a blank block; tapping a tab rebuilt the children and re-ran the measurement,
+        // which is why the content "came out by tapping". Now the window hands the ScrollView the full screen
+        // height (EXACTLY) and the ScrollView measures the inner LinearLayout with UNSPECIFIED height, so the inner layout and its children can only take their natural height and the container cannot collapse to 0 again.
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
         sv.setBackgroundColor(Ui.bg(this));
@@ -178,7 +178,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
         rootBox = root;
 
-        // 标题栏：标题占满剩余宽度，右侧依次是「语言」「返回」。
+        // Title bar: the title takes the remaining width, with "Language" and "Back" on its right.
         LinearLayout head = Ui.row(this);
         head.addView(Ui.title(this, t("mm_title")), Ui.weight(1f));
         Button lang = Ui.headerAction(this, t("mm_lang"));
@@ -209,7 +209,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
             bar.addView(b, Ui.weight(1f));
         }
         root.addView(bar, Ui.fill());
-        // 分隔线自带 LayoutParams，别再被 Ui.fill() 覆盖成 0 高（那样线会消失）。
+        // The divider carries its own LayoutParams; do not let Ui.fill() override it to 0 height (the line would vanish).
         root.addView(Ui.divider(this), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(this, 1))));
 
@@ -224,8 +224,8 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     }
 
     /**
-     * 首帧之后自检：内容区若仍是 0 高（个别设备首帧不给内层测量），重建一次当前页即可恢复。
-     * 正常情况下这个分支不会走到。
+     * Post-first-frame self check: when the content area is still 0 high (some devices skip measuring the
+     * inner layout on the first frame), rebuilding the current page once restores it; normally this branch is never taken.
      */
     private void settleLayout() {
         if (rootBox == null) {
@@ -263,7 +263,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    // ------------------------------------------------------------ 模组页
+    // ------------------------------------------------------------ mods page
 
     private void showMods() {
         content.removeAllViews();
@@ -345,7 +345,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         });
     }
 
-    // ------------------------------------------------------------ 地图页
+    // ------------------------------------------------------------ maps page
 
     private void showMaps() {
         content.removeAllViews();
@@ -464,7 +464,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    // ------------------------------------------------------------ 关于页
+    // ------------------------------------------------------------ about page
 
     private void showAbout() {
         content.removeAllViews();
@@ -572,7 +572,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    // ------------------------------------------------------------ 导入
+    // ------------------------------------------------------------ import
 
     private void pick(int req) {
         try {
@@ -680,7 +680,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         return "mod.zip";
     }
 
-    // ------------------------------------------------------------ 点击
+    // ------------------------------------------------------------ clicks
 
     public void onClick(View v) {
         int id = v == null ? 0 : v.getId();
@@ -753,7 +753,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    // ------------------------------------------------------------ 小工具
+    // ------------------------------------------------------------ small helpers
 
     private String t(String key) {
         return L10n.t(this, key, key);
@@ -846,7 +846,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    /** 诊断信息：贴到反馈里用的。 */
+    /** Diagnostics: meant to be pasted into a bug report. */
     private String diag() {
         StringBuilder b = new StringBuilder();
         b.append("version: ").append(VERSION).append(" (").append(BUILD).append(")\n");
@@ -867,7 +867,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     }
 
     /**
-     * 布局说明：整屏就是一个 ScrollView（见 buildRoot 的注释），不再需要第 5 版那个
-     * 「AT_MOST 当成 EXACTLY」的兜底测量类。
+     * Layout note: the whole screen is one ScrollView (see the comment in buildRoot), so the round-5 fallback
+     * measuring class that treated AT_MOST as EXACTLY is no longer needed.
      */
 }

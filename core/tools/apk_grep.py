@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-"""在 APK 内（解压后）搜索若干字节串，用来确认游戏本体认识哪些文件名/目录名。
+"""Search an APK (after decompression) for a few byte strings, to confirm which file/directory names the game itself recognises.
 
-用法: python tools/apk_grep.py <apk> needle1 needle2 ...
-输出: 每个 needle 命中的条目列表 + 命中次数。
+Usage: python tools/apk_grep.py <apk> needle1 needle2 ...
+Output: for each needle, the list of matching entries plus a hit count.
 """
 import re
 import sys
 import zipfile
 
-# 只扫可能藏字符串的条目，跳过图片/音频等大文件
+# only scan entries that may contain strings; skip large images/audio files
 SKIP = re.compile(r"\.(png|jpg|jpeg|ogg|wav|mp3|ttf|otf|webp|dat)$", re.I)
 KEEP = re.compile(r"(\.so$|\.dex$|^assets/.*\.(txt|json|xml|cfg|ini)$)", re.I)
 
@@ -36,7 +36,7 @@ def main():
                     if len(hits[text]) < 8:
                         hits[text].append((name, c))
     for text in sys.argv[2:]:
-        print("### %s -> %d 次" % (text, counts[text]))
+        print("### %s -> %d hits" % (text, counts[text]))
         for name, c in hits[text]:
             print("    %-60s x%d" % (name, c))
 

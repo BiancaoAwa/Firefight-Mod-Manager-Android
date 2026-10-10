@@ -9,7 +9,7 @@ gen_l10n.py 会把 EN_R3 追加进 EN、把 T_R3 合并进 T（缺的键自动�
 """
 
 EN_R3 = [
-    # ---- 入口提示框（规格①）----
+    # ---- launch prompt (spec 1) ----
     ("mm_prompt_title", "Firefight Mod Manager"),
     ("mm_prompt_msg", "Use the mod manager?"),
     ("mm_prompt_auto", "closes in "),
@@ -17,7 +17,7 @@ EN_R3 = [
     ("mm_yes", "Yes"),
     ("mm_no", "No"),
 
-    # ---- 通用的管理器标题 / 标签页 ----
+    # ---- shared manager title / tabs ----
     ("mm_title", "Firefight Mod Manager"),
     ("mm_tab_mods", "Mods"),
     ("mm_tab_maps", "Maps"),
@@ -30,7 +30,7 @@ EN_R3 = [
     ("mm_root_unavailable", "Storage folder unavailable (grant \"All files access\")"),
     ("mm_op_failed", "Operation failed"),
 
-    # ---- 模组管理页（规格②）----
+    # ---- Mods page (spec 2) ----
     ("mm_mods_count", "Installed mods: "),
     ("mm_mods_total", "Total size: "),
     ("mm_mods_slots_note", "Only the first 5 mods are shown."),
@@ -52,7 +52,7 @@ EN_R3 = [
     ("mm_import_fail", "Import failed"),
     ("mm_import_cancel", "Cancelled"),
 
-    # ---- 地图管理页（规格③）----
+    # ---- Maps page (spec 3) ----
     ("mm_maps_count", "Installed maps: "),
     ("mm_maps_total", "Total size: "),
     ("mm_page", "Page "),
@@ -70,14 +70,14 @@ EN_R3 = [
     ("mm_map_state", "State: "),
     ("mm_map_imported", "Map imported: "),
 
-    # ---- 删除二次确认 ----
+    # ---- delete confirmation ----
     ("mm_del_title", "Confirm delete"),
     ("mm_del_mod", "Delete this mod and all of its files?"),
     ("mm_del_map", "Delete this map and all of its files?"),
     ("mm_deleted", "Deleted"),
     ("mm_del_failed", "Delete failed"),
 
-    # ---- 关于管理器页（规格④）----
+    # ---- About page (spec 4) ----
     ("mm_about_meta", "Manager information"),
     ("mm_about_site", "Game official website"),
     ("mm_about_repo", "GitHub repository"),

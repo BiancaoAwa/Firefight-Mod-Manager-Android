@@ -1,15 +1,15 @@
-# Firefight 模组管理器 —— 构建脚本共用的环境探测
-# 由 build.ps1 / prepare_work.ps1 以 . (dot-source) 方式加载；不单独运行。
+# Firefight Mod Manager -- shared environment detection for the build scripts
+# Dot-sourced by build.ps1 and prepare_work.ps1; not meant to run on its own.
 #
-# 路径全部相对本仓库，不写死用户名：
-#   <repo>/                     仓库根
-#   <repo>/core/                源码与工具（core/src, core/stub, core/tools, core/assets）
-#   <repo>/core/work/v35        反编译出来的交战工程（不入库，由 prepare_work.ps1 生成）
-#   <repo>/core/framework/1.apk apktool 框架文件（不入库，自动从 apktool jar 取出）
-#   <repo>/core/build/          中间产物（不入库）
-#   <repo>/out/                 成品 APK（不入库）
+# All paths are relative to this repository, with no hard-coded user name:
+#   <repo>/                      repository root
+#   <repo>/core/                 sources and tools (core/src, core/stub, core/tools, core/assets)
+#   <repo>/core/work/v35         the decoded Firefight project (not committed, created by prepare_work.ps1)
+#   <repo>/core/framework/1.apk  apktool framework file (not committed, extracted from the apktool jar)
+#   <repo>/core/build/           intermediate artifacts (not committed)
+#   <repo>/out/                  final APKs (not committed)
 
-$ErrorActionPreference = "Continue"   # 不能用 Stop：原生命令的 stderr 会被当成终止错误
+$ErrorActionPreference = "Continue"   # not Stop: a native command's stderr would be treated as a terminating error
 
 $ToolsDir = $PSScriptRoot
 $CoreDir  = Split-Path -Parent $ToolsDir
@@ -34,7 +34,7 @@ function Get-VerKey([string]$n) {
     return [version]'0.0'
 }
 
-# ------------------------------------------------------------------ 工具探测
+# ------------------------------------------------------------------ tool detection
 
 function Resolve-JdkHome([string]$explicit) {
     $cand = @()
@@ -105,10 +105,10 @@ function Resolve-Python([string]$explicit) {
     return ""
 }
 
-# ------------------------------------------------------------------ 依赖准备
+# ------------------------------------------------------------------ dependency preparation
 
-# apktool 3.x 自带 prebuilt/android-framework.jar，取出来就是框架目录里的 1.apk。
-# 这样仓库里不用塞 4 MB 的框架文件，别人克隆下来第一次跑就能自己生成。
+# apktool 3.x bundles prebuilt/android-framework.jar; extracting it yields the 1.apk in the framework directory.
+# That way the repository does not carry a 4 MB framework file and a fresh clone generates it on the first run.
 function Ensure-Framework([string]$apktoolJar, [string]$dir) {
     $dst = Join-Path $dir "1.apk"
     if (Test-Path $dst) { return $dst }
@@ -118,21 +118,21 @@ function Ensure-Framework([string]$apktoolJar, [string]$dir) {
     try {
         $e = $zip.GetEntry("prebuilt/android-framework.jar")
         if (-not $e) {
-            # 注意：这些提示必须走 Write-Host，不能走 Write-Output——本函数要「返回路径」，
-            # 混进来的字符串会让调用方拿到数组，后面拼命令行时就串参数了。
-            Write-Host "  apktool jar 中没有 prebuilt/android-framework.jar（apktool 版本过旧？）"
-            Write-Host "  请手动执行: java -jar $apktoolJar if -p `"$dir`" <framework-res.apk>"
+# Note: these messages must go through Write-Host, never Write-Output -- this function returns a path,
+# and a stray string would make the caller receive an array, skewing the command line built later.
+Write-Host "  no prebuilt/android-framework.jar inside the apktool jar (apktool too old?)"
+Write-Host "  Please run manually: java -jar $apktoolJar if -p `"$dir`" <framework-res.apk>"
             return ""
         }
         [System.IO.Compression.ZipFileExtensions]::ExtractToFile($e, $dst, $true)
     } finally {
         $zip.Dispose()
     }
-    Write-Host "  已从 apktool 内提取框架文件: $dst ($((Get-Item $dst).Length) bytes)"
+Write-Host "  extracted the framework file from apktool: $dst ($((Get-Item $dst).Length) bytes)"
     return $dst
 }
 
-# 没有调试签名证书就现生成一个（keytool 随 JDK 提供），避免依赖别的机器。
+# Generate a debug signing certificate when there is none (keytool ships with the JDK), avoiding a dependency on another machine.
 function Ensure-Keystore([string]$jdk, [string]$path) {
     if (Test-Path $path) { return $path }
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
@@ -140,7 +140,7 @@ function Ensure-Keystore([string]$jdk, [string]$path) {
         -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US" `
         -keyalg RSA -keysize 2048 -validity 10000 2>&1 | Out-Null
     if (Test-Path $path) {
-        Write-Host "  已生成调试签名证书: $path"
+Write-Host "  generated a debug signing certificate: $path"
         return $path
     }
     return ""

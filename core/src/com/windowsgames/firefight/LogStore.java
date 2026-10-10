@@ -19,13 +19,13 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 日志落盘（需求⑥）：Download/Firefight-Mod-Manager/<包名>/log_<yyyyMMdd_HHmmss>.txt
+ * Log persistence (requirement 6): Download/Firefight-Mod-Manager/<package>/log_<yyyyMMdd_HHmmss>.txt
  *
- * 三级写入策略：
- *   1) 公共 Download 目录的普通文件（有「所有文件访问」时可用）
- *   2) MediaStore Downloads（API29+，无需特殊权限，RELATIVE_PATH 指定同样目录）
- *   3) 应用私有外部目录 <externalFilesDir>/Firefight-Mod-Manager/<包名>/（永远可写）
- * 保留最近 MAX_FILES 份日志。
+ * Three-tier write strategy:
+ *   1) A plain file in the public Download directory (available with "all files access")
+ *   2) MediaStore Downloads (API 29+, no special permission, same directory via RELATIVE_PATH)
+ *   3) The app-private external directory <externalFilesDir>/Firefight-Mod-Manager/<package>/ (always writable)
+ * Keeps the MAX_FILES most recent logs.
  */
 public final class LogStore {
 
@@ -51,7 +51,7 @@ public final class LogStore {
         return PREFIX + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
     }
 
-    /** 公共 Download 目录；不可写时返回 null。 */
+    /** Public Download directory; null when it is not writable. */
     public static File publicDir(Context c) {
         try {
             File dl = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -67,7 +67,7 @@ public final class LogStore {
         return null;
     }
 
-    /** 私有兜底目录；不可写时返回 null。 */
+    /** Private fallback directory; null when it is not writable. */
     public static File fallbackDir(Context c) {
         try {
             File ext = c.getExternalFilesDir(null);
@@ -96,7 +96,7 @@ public final class LogStore {
         ready = true;
     }
 
-    /** 追加一条事件并立即落盘。 */
+    /** Append one event and flush it to disk immediately. */
     public static synchronized void event(Context c, String msg) {
         try {
             buffer.add(stamp() + "  " + msg);
@@ -181,14 +181,14 @@ public final class LogStore {
         }
     }
 
-    /** 当前日志文件（或 content uri）的可读路径，用于「关于」页展示。 */
+    /** Readable path of the current log file (or content uri), shown on the About page. */
     public static synchronized String path(Context c) {
         init(c);
         return shownPath == null ? "" : shownPath;
     }
 
 
-    /** 清理历史日志：同名目录下按文件名倒序，只留最近 MAX_FILES 份。 */
+    /** Prune old logs: in the same directory, sort file names descending and keep only the newest MAX_FILES. */
     public static void prune(Context c) {
         try {
             File d = publicDir(c);

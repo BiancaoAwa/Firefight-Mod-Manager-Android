@@ -21,15 +21,15 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
- * 自定义地图导入（需求⑦）。
+ * Custom map import (requirement 7).
  *
- * 游戏侧事实（从 libmain.so 的字符串表和官方文档核实）：
- *   - 地图目录 = &lt;base&gt;/Custom Maps/，每张地图一个 4 字符代码命名的文件夹：
+ * Game-side facts (verified against the string table of libmain.so and the official docs):
+ *   - Map directory = &lt;base&gt;/Custom Maps/, one folder per map named after its 4-character code:
  *     Custom Maps/&lt;CODE&gt;/&lt;CODE&gt;-world.dat / -contours.png / -tileNN.jpg / -scenarios.dat ...
- *   - 同目录下必须有一份 CustomMapCodeNames.txt，把地图的 4 字符代码列进去，
- *     否则游戏不认这张地图。
- *   - 地图包（网上下载的）是以 4 字符代码命名的压缩包。
- * 管理器要做的：把 zip 解到 Custom Maps/&lt;CODE&gt;/，并把 CODE 登记进 CustomMapCodeNames.txt。
+ *   - The same directory must contain a CustomMapCodeNames.txt listing the map's 4-character code,
+ *     otherwise the game does not recognize the map.
+ *   - Downloaded map packages are archives named after the 4-character code.
+ * What the manager does: extract the zip into Custom Maps/&lt;CODE&gt;/ and register CODE in CustomMapCodeNames.txt.
  */
 public final class MapImporter {
 
@@ -41,25 +41,25 @@ public final class MapImporter {
     private MapImporter() {
     }
 
-    // ------------------------------------------------------------ 数据结构
+    // ------------------------------------------------------------ data structures
 
     public static class MapEntry {
         public String code = "";
         public File dir;
         public int files;
         public long bytes;
-        /** 文件夹在磁盘上。 */
+        /** Folder exists on disk. */
         public boolean present;
-        /** 代码已登记进 CustomMapCodeNames.txt。 */
+        /** Code registered in CustomMapCodeNames.txt. */
         public boolean listed;
-        /** <CODE>-scenarios.txt 里 <map> 下的第一个 <name>，取不到为空串。 */
+        /** First <name> under <map> in <CODE>-scenarios.txt; empty string when it is not found. */
         public String name = "";
 
         public String label() {
             return code;
         }
 
-        /** 规格③：名字读 ****-scenarios.txt 的 &lt;name&gt;，取不到显示 4 位代码。 */
+        /** Spec 3: name read from <name> in ****-scenarios.txt, falling back to the 4-character code. */
         public String display(Context c) {
             if (name != null && name.length() > 0) {
                 return name;
@@ -67,7 +67,7 @@ public final class MapImporter {
             return code;
         }
 
-        /** 规格③：地图文件大小（自适应 KB / MB）。 */
+        /** Spec 3: map size on disk (auto KB / MB). */
         public String sizeText() {
             return human(bytes);
         }
@@ -83,7 +83,7 @@ public final class MapImporter {
         }
     }
 
-    /** 规格③：读 &lt;dir&gt;/&lt;CODE&gt;-scenarios.txt 里 &lt;map&gt; 的第一个 &lt;name&gt;。 */
+    /** Spec 3: read the first <name> under <map> in <dir>/<CODE>-scenarios.txt. */
     public static String mapName(File dir, String code) {
         if (dir == null || code == null || code.length() == 0) {
             return "";
@@ -108,7 +108,7 @@ public final class MapImporter {
         return "";
     }
 
-    /** 地图的剧本文件：&lt;CODE&gt;-scenarios.txt 优先，其次 .dat（.so 里两种都出现过）。 */
+    /** Scenario file of a map: <CODE>-scenarios.txt first, then .dat (both appear in the .so). */
     public static File scenariosFile(File dir, String code) {
         if (dir == null || code == null) {
             return null;
@@ -133,7 +133,7 @@ public final class MapImporter {
         return null;
     }
 
-    // ------------------------------------------------------------ 目录
+    // ------------------------------------------------------------ directories
 
     public static File mapsRoot(Context c) {
         File base = MyGame.rootOfStatic(c);
@@ -152,7 +152,7 @@ public final class MapImporter {
         return r == null ? null : new File(r, CODES);
     }
 
-    // ------------------------------------------------------------ 列表
+    // ------------------------------------------------------------ listing
 
     public static List<MapEntry> listMaps(Context c) {
         List<MapEntry> out = new ArrayList<MapEntry>();
@@ -198,7 +198,7 @@ public final class MapImporter {
         return out;
     }
 
-    /** 读 CustomMapCodeNames.txt 里的 4 字符代码（按行取第一个 token）。 */
+    /** Read the 4-character codes in CustomMapCodeNames.txt (first token of each line). */
     public static List<String> readCodes(Context c) {
         List<String> out = new ArrayList<String>();
         File f = codesFile(c);
@@ -223,8 +223,8 @@ public final class MapImporter {
     }
 
     /**
-     * 从一行里取地图代码。官方文件的具体写法没有样本，
-     * 所以这里尽量宽容：取第一个 token，遇到 '=' ':' '|' 就截断，再校验是不是 4 位代码。
+     * Extract a map code from one line. There is no sample of the official file format,
+     * so stay permissive: take the first token, cut at '=' ':' '|', then check that it is a 4-character code.
      */
     private static String firstCode(String line) {
         if (line == null) {
@@ -256,7 +256,7 @@ public final class MapImporter {
         return t.toUpperCase(Locale.US);
     }
 
-    // ------------------------------------------------------------ 登记 / 注销代码
+    // ------------------------------------------------------------ register / unregister codes
 
     public static boolean registerCode(Context c, String code) {
         if (code == null || code.length() != 4) {
@@ -322,12 +322,12 @@ public final class MapImporter {
     }
 
 
-    // ------------------------------------------------------------ 导入
+    // ------------------------------------------------------------ import
 
     /**
-     * 导入一个地图 zip。
+     * Import one map zip.
      *
-     * @return "ok:CODE" / "nocode"（名字里找不到 4 字符代码）/ "fail"
+     * @return "ok:CODE" / "nocode" (no 4-character code in the name) / "fail"
      */
     public static String importZip(Context c, InputStream in, String zipName) {
         File root = mapsRoot(c);
@@ -377,7 +377,7 @@ public final class MapImporter {
         }
     }
 
-    /** 删除一张地图：删文件夹 + 从代码表注销。 */
+    /** Delete a map: remove the folder and unregister its code. */
     public static String remove(Context c, String code) {
         if (code == null || code.length() == 0) {
             return "fail";
@@ -396,7 +396,7 @@ public final class MapImporter {
         return ok ? "ok" : "fail";
     }
 
-    /** 解包：zip 根下就一层同名文件夹时，把内层拿出来用。 */
+    /** Unpack: when the zip root holds a single same-named folder, use the inner one. */
     private static File unwrap(File tmp, String code) {
         File[] kids = tmp.listFiles();
         if (kids != null && kids.length == 1 && kids[0].isDirectory()) {
@@ -409,8 +409,8 @@ public final class MapImporter {
     }
 
     /**
-     * 找 4 字符代码：优先「叫 <CODE> 且里面有 <CODE>-xxx 文件」的文件夹，
-     * 其次地图内容文件名前缀，最后回落 zip 文件名。
+     * Find the 4-character code: prefer a folder "whose name is <CODE> and which holds <CODE>-xxx files",
+     * then the prefix of the content file names, and finally the zip file name.
      */
     public static String detectCode(File dir, String zipName) {
         String fromZip = fromName(zipName);
@@ -444,7 +444,7 @@ public final class MapImporter {
         return null;
     }
 
-    /** 找一个「文件夹名是 4 字符」且内部有 <该代码>- 开头的文件的位置。 */
+    /** Find a location whose folder name is 4 characters long and that holds files starting with <that code>-. */
     private static String scanForCode(File dir, int depth) {
         if (depth > 3) {
             return null;
@@ -458,7 +458,7 @@ public final class MapImporter {
                 return a.getName().compareToIgnoreCase(b.getName());
             }
         });
-        // 先看目录本身有没有 <CODE>-world.dat 这种内容
+        // first check whether the directory itself holds <CODE>-world.dat-like content
         String own = codeFromContent(kids);
         if (own != null) {
             return own;
@@ -523,9 +523,9 @@ public final class MapImporter {
         return false;
     }
 
-    // ------------------------------------------------------------ zip / 文件工具
+    // ------------------------------------------------------------ zip / file helpers
 
-    /** 解 zip 到 dst，返回解出的条目数；跳过 __MACOSX 与 .DS_Store，拒绝路径穿越。 */
+    /** Extract a zip into dst and return the number of entries written; skips __MACOSX and .DS_Store, rejects path traversal. */
     public static int extractZip(InputStream raw, File dst) throws Exception {
         ZipInputStream zin = new ZipInputStream(raw);
         int n = 0;
