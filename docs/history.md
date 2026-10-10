@@ -202,6 +202,28 @@ longer referenced by Java), `stored-so-violations: 0`; build and `verify_apk.ps1
 
 ---
 
+## Round 10: the AOSP testkey as the default signature
+
+**Problem**: builds were signed with a locally generated debug certificate, while the game
+and the official packager use the public AOSP testkey, so test packages could not be matched
+against anything reproducible.
+
+**Fix**: `core/keystore/testkey.jks` (alias and password both `testkey`, the same key the
+official Firefight mod packager ships in `keys/testkey.jks`) is now committed and used
+automatically when `-Keystore` is not passed; the generated debug keystore stays as the
+fallback. `build.ps1` gained `-KsPass`, `-KeyAlias` and `-KeyPass` and prints the chosen key,
+and `.gitignore` ignores `core/keystore/*` except the testkey.
+
+**Result**: `build.ps1 -OutName ...-testkey.apk` -> `BUILD OK`; `apksigner verify --print-certs`
+reports certificate SHA-256 `a40da80a59d170caa950cf15c18c454d47a39b26989d8b640ecd745ba71bf5dc`;
+`verify_apk.ps1` -> `RESULT: PASS`.
+
+**Convention set in this round**: everything published on GitHub (repository description,
+commit messages, PR titles and bodies, issues) is written in English; the documents keep a
+Chinese twin under `docs/zh-CN/`.
+
+---
+
 ## Traps hit (quick reference)
 
 | Trap | Lesson |
