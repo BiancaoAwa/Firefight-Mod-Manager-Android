@@ -1,94 +1,106 @@
-# 把模组管理器部署进交战 APK
+# Deploying the mod manager into a Firefight APK
 
-本文面向「拿到这套源码，想把它装进自己那份交战（Firefight）APK」的人。全部流程是
-两条 PowerShell 命令：先把游戏 APK 反编译成工作树并打上补丁，再编译出一个新的 APK。
+**English** | [中文](../zh-CN/deploy.md)
+
+This document is for anyone who has this source tree and wants to put it into their own
+Firefight (交战) APK. The whole flow is two PowerShell commands: first decode the game APK
+into a worktree and patch it, then build a new APK.
 
 ---
 
-## 1. 管理器是什么
+## 1. What the manager is
 
-管理器是一套纯 Java 的 Android 界面代码（`core/src/com/windowsgames/firefight/`），
-以**额外的 dex** 追加进交战 APK，并提供三个 Activity：
+The manager is a set of pure-Java Android UI code (`core/src/com/windowsgames/firefight/`)
+appended to the Firefight APK as an **extra dex**, providing three Activities:
 
-| 组件 | 作用 |
+| Component | Role |
 | --- | --- |
-| `MyGame` | 新的启动 Activity。游戏启动时先弹一个提示框「是否使用模组管理器」，选「是」进管理器，选「否」或 15 秒超时直接进游戏 |
-| `ModManagerActivity` | 管理器主界面：模组管理 / 地图管理 / 关于管理器 三个页签，标题栏可切换界面语言、可返回游戏 |
-| `ModImportActivity` | 从文件管理器 / 其他应用「打开方式」里接收 `.zip`，把模组包导入管理器 |
+| `MyGame` | The new launcher Activity. On start it first shows the prompt "use the mod manager?"; "Yes" opens the manager, "No" or the 15-second timeout goes straight into the game |
+| `ModManagerActivity` | The main manager screen: the Mods / Maps / About tabs, with a title bar that can switch the UI language and return to the game |
+| `ModImportActivity` | Receives `.zip` files from a file manager or another app's "open with", and imports the mod package |
 
-它不改游戏逻辑，只借用游戏的包名和沙盒：
+It does not change game logic; it borrows the game's package name and sandbox:
 
-* **必须是同一个包名、同一份签名**，玩家装的是「游戏 + 管理器」一个 App，存档、模组目录、
-  权限都属于这个 App。所以正确做法是把管理器打到你**自己那份已经打过模组的交战 APK** 上，
-  而不是从零做一个新 App。
-* 管理器要读写模组/地图目录，沿用游戏已声明的 `MANAGE_EXTERNAL_STORAGE` 权限，不额外申请。
+* **It must use the same package name and the same signature**, because the player installs
+  "game + manager" as a single app: saves, the mod directory and permissions all belong to
+  that app. The right approach is therefore to patch the manager into **your own modded
+  Firefight APK**, not to build a new app from scratch.
+* The manager needs to read and write the mod/map directories; it reuses the
+  `MANAGE_EXTERNAL_STORAGE` permission the game already declares and requests nothing extra.
 
 ---
 
-## 2. 需要准备什么
+## 2. What you need
 
-### 2.1 输入
+### 2.1 Input
 
-* **你自己的交战 APK**（已经打过模组的那个）。判定方法：能解出 `smali/com/windowsgames/firefight/`
-  与 `assets/` 目录，包名 `com.windowsgames.firefight`，版本 13.2.0（`versionCode 13200`）。
-  本项目开发时用的是 `Sean's 13.2.0_Mod_v35(1).apk`（272 MB）。
-* 注意：**不要**用未打过模组的原始安装包当输入，那样你辛苦做的模组内容不在里面。
+* **Your own Firefight APK** (the one you already modded). How to tell: it must decode into
+  `smali/com/windowsgames/firefight/` and an `assets/` directory, with package name
+  `com.windowsgames.firefight` and version 13.2.0 (`versionCode 13200`). This project was
+  developed against `Sean's 13.2.0_Mod_v35(1).apk` (272 MB).
+* Note: do **not** use the unmodded original package as input, otherwise the mod content you
+  worked on will not be inside.
 
-### 2.2 工具链
+### 2.2 Toolchain
 
-| 工具 | 版本要求 | 用途 | 脚本怎么找 |
+| Tool | Version | Purpose | How the script finds it |
 | --- | --- | --- | --- |
-| JDK | 17+（开发用 25） | `javac` 编译管理器、`keytool` 生成签名、跑 apktool | `-JdkHome` 或 `JAVA_HOME` |
-| Android SDK · platforms | 含 `android.jar`（开发用 android-36.1） | 编译时的 `-cp`/`--lib` | `-AndroidSdk`、`ANDROID_HOME`、`ANDROID_SDK_ROOT`、默认 `%LOCALAPPDATA%\Android\Sdk` |
-| Android SDK · build-tools | 含 `d8.bat`、`zipalign.exe`、`apksigner.bat`、`aapt2.exe`（开发用 36.1.0） | 转 dex、对齐、签名、验包 | 同上，取版本号最大的一个 |
-| Python | 3.8+ | 生成本地化资源、注入 dex、验包 | `-Python` 或 PATH 上的 `python` |
-| apktool | 3.x jar | 反编译 / 回编译游戏 | `-ApktoolJar`、`APKTOOL_JAR`、`core\tools\apktool.jar`，或自动去 `Downloads` 找 |
+| JDK | 17+ (25 used in development) | `javac` to compile the manager, `keytool` for signing, running apktool | `-JdkHome` or `JAVA_HOME` |
+| Android SDK · platforms | containing `android.jar` (android-36.1 used in development) | `-cp`/`--lib` at compile time | `-AndroidSdk`, `ANDROID_HOME`, `ANDROID_SDK_ROOT`, default `%LOCALAPPDATA%\Android\Sdk` |
+| Android SDK · build-tools | containing `d8.bat`, `zipalign.exe`, `apksigner.bat`, `aapt2.exe` (36.1.0 used in development) | dex conversion, alignment, signing, verification | same, highest version wins |
+| Python | 3.8+ | generating localisation resources, injecting the dex, verifying the APK | `-Python` or `python` on PATH |
+| apktool | 3.x jar | decoding / rebuilding the game | `-ApktoolJar`, `APKTOOL_JAR`, `core\tools\apktool.jar`, or an automatic search in `Downloads` |
 
-apktool 需要的框架文件不用自己准备：脚本会从 apktool jar 里取出内置的
-`prebuilt/android-framework.jar`，放进 `core/framework/1.apk` 后传给 `apktool -p`。
-（这份框架文件与官方 apktool 发布包里的一致，SHA-256
-`5DD984016ED5A5EB0EEF866E2C6E8CD352E1427828EC23ADB18005CF5648F3D7`，4,488,013 字节。）
+You do not need to prepare the framework file apktool needs: the script extracts the bundled
+`prebuilt/android-framework.jar` from the apktool jar, stores it as `core/framework/1.apk`
+and passes it to `apktool -p`. (This framework file matches the one in the official apktool
+release, SHA-256
+`5DD984016ED5A5EB0EEF866E2C6E8CD352E1427828EC23ADB18005CF5648F3D7`, 4,488,013 bytes.)
 
-签名证书也不用准备：没给 `-Keystore` 时脚本用 `keytool` 生成一个
-`androiddebugkey`（口令 `android`）放在 `core/keystore/debug.keystore`。
-这只是调试签名；要发布请换成你自己的证书。
+You do not need to prepare a signing keystore either: without `-Keystore` the script uses
+`keytool` to create an `androiddebugkey` (password `android`) at
+`core/keystore/debug.keystore`. That is a debug signature only; use your own certificate to
+publish.
 
-### 2.3 磁盘与系统
+### 2.3 Disk and system
 
-* 空余磁盘 **1.5 GB 以上**：工作树约 340 MB，构建中间产物（unsigned/aligned/签名包）约 780 MB，
-  输出包约 260 MB。
-* Windows + PowerShell 7（`pwsh`）。脚本用的是 PowerShell 语法，Linux/macOS 上需自行改写。
+* **1.5 GB or more of free disk space**: the worktree is about 340 MB, the build
+  intermediates (unsigned/aligned/signed) about 780 MB, and the output package about 260 MB.
+* Windows with PowerShell (`pwsh` 7 or Windows PowerShell 5.1; the examples use `pwsh`,
+  replace it with `powershell` on 5.1). The scripts are PowerShell; porting them to
+  Linux/macOS is up to you.
 
 ---
 
-## 3. 三步走
+## 3. Three steps
 
-在仓库根目录打开 PowerShell：
+Open PowerShell in the repository root:
 
 ```powershell
-# 0) 允许本地脚本执行（当前会话有效）
+# 0) allow local script execution (for this session only)
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
-# 1) 反编译游戏 + 打补丁（2~4 分钟）
+# 1) decode the game + patch (2-4 minutes)
 pwsh -File core/tools/prepare_work.ps1 -GameApk "D:\APK\Sean's 13.2.0_Mod_v35(1).apk"
 
-# 2) 编译管理器并出包（5~10 分钟，apktool 回编译 230 MB+ 比较慢）
+# 2) compile the manager and produce the package (5-10 minutes; rebuilding 230 MB+ with apktool is slow)
 pwsh -File core/tools/build.ps1
 
-# 3) 静态验证（可选但强烈建议）
+# 3) static verification (optional but strongly recommended)
 pwsh -File core/tools/verify_apk.ps1
 ```
 
-产物：`out/Firefight-Mod-Manager-13.2.0-mgr0.1.0.apk`（约 260 MB）。
+Artifact: `out/Firefight-Mod-Manager-13.2.0-mgr0.1.0.apk` (about 260 MB).
 
-安装到设备：
+Install it on a device:
 
 ```powershell
 adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.0.apk
 ```
 
-如果设备上已经装了别的签名的同包名 App，`adb install -r` 会报
-`INSTALL_FAILED_UPDATE_INCOMPATIBLE`，此时先卸载旧包（会丢存档，先备份）：
+If the device already has an app with the same package name but a different signature,
+`adb install -r` reports `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; uninstall the old package
+first (this loses saves, back them up):
 
 ```powershell
 adb uninstall com.windowsgames.firefight
@@ -96,88 +108,102 @@ adb uninstall com.windowsgames.firefight
 
 ---
 
-## 4. 这两条命令各自做了什么
+## 4. What each command does
 
 ### 4.1 `prepare_work.ps1`
 
-1. 解析工具链，准备 `core/framework/1.apk`。
-2. `apktool d -f -p core/framework -o core/work/v35 <你的 APK>`，反编译日志写
-   `core/logs/decode.log`。
-3. 跑 `core/tools/patch_worktree.py`，它对工作树做三件幂等的事：
-   * **注册两个 Activity**：在 `AndroidManifest.xml` 里游戏自己的 `MyGame` 之后插入
-     `ModManagerActivity`（`exported=false`）与 `ModImportActivity`（`exported=true`，
-     带 3 个 intent-filter：`VIEW application/zip`、`VIEW application/x-zip-compressed`、
-     `SEND application/zip`）。重复执行不会插第二遍。
-   * **放进示例模组**：`core/assets/Mod/` → `work/v35/assets/Mod/`。
-   * **让位旧的游戏入口**：把 `smali*/com/windowsgames/firefight/MyGame.smali`
-     备份成 `core/backup/MyGame.smali.orig` 后删除 —— 新的 `MyGame` 由 Java 源码提供，
-     同一个类名，dex 里只有一份。
-4. 自检：打印两个 Activity 是否已注册、旧 smali 是否已移除，不通过就报错退出。
+1. Resolves the toolchain and prepares `core/framework/1.apk`.
+2. `apktool d -f -p core/framework -o core/work/v35 <your APK>`; the decode log goes to
+   `core/logs/decode.log`.
+3. Runs `core/tools/patch_worktree.py`, which performs three idempotent patches:
+   * **Register the two Activities**: after the game's own `MyGame` in `AndroidManifest.xml`,
+     insert `ModManagerActivity` (`exported=false`) and `ModImportActivity` (`exported=true`
+     with 3 intent-filters: `VIEW application/zip`, `VIEW application/x-zip-compressed`,
+     `SEND application/zip`). Running it again does not insert a second copy.
+   * **Add the sample mods**: `core/assets/Mod/` -> `work/v35/assets/Mod/`.
+   * **Make room for the old game entry point**: back up
+     `smali*/com/windowsgames/firefight/MyGame.smali` to `core/backup/MyGame.smali.orig`
+     and delete it -- the new `MyGame` comes from Java source, and only one copy of that
+     class name may exist in the dex files.
+4. Self-check: prints whether both Activities are registered and whether the old smali is
+   gone, and exits with an error if not.
 
-`-Force` 会删掉已有工作树重来；`-SkipPatch` 只反编译不补丁（自己手动改工作树时用）。
+`-Force` deletes an existing worktree and starts over; `-SkipPatch` only decodes without
+patching (for when you edit the worktree by hand).
 
-### 4.2 `build.ps1`（8 步）
+### 4.2 `build.ps1` (8 steps)
 
-| 步骤 | 做什么 | 关键点 |
+| Step | What it does | Key point |
 | --- | --- | --- |
-| [1/8] | `gen_l10n.py` 生成 `res/values*/ffm_strings.xml` | 28 个语种 + 默认英文；同时校验 Java 里用到的每个 `t("key")` 都有定义 |
-| [2/8] | 备份并删除旧的 `MyGame.smali` | 幂等：已经删过就跳过 |
-| [3/8] | `javac --release 8` 编译 `core/stub` 里的 `SDLActivity` 桩 | 只是为了让管理器代码能编译过，不进包 |
-| [4/8] | `javac --release 8` 编译 `core/src` 全部源码 → `jar` | 会打印 class 文件数 |
-| [5/8] | `d8 --min-api 24 --release` 转 `classes.dex` | |
-| [6/8] | `apktool b -p core/framework -o core/build/unsigned.apk core/work/v35` | 日志 `core/logs/build-apktool.log` |
-| [7/8] | `inject_dex.py` 把 `classes.dex` 以 **`classes4.dex`** 追加进 APK | append-only：原来的 dex 与 `.so` 条目一律不重写，保证体积巨大的 `.so` 仍以 `stored`（不压缩）方式存在 |
-| [8/8] | `zipalign -f -p 4` + `apksigner sign`（v1+v2） | `-NoSign` 可跳过去拿未签名包 |
+| [1/8] | `gen_l10n.py` generates `res/values*/ffm_strings.xml` | 28 languages + default English; also validates that every `t("key")` used in Java is defined |
+| [2/8] | Back up and delete the old `MyGame.smali` | Idempotent: skipped if already deleted |
+| [3/8] | `javac --release 8` compiles the `SDLActivity` stub in `core/stub` | Only so the manager sources compile; never packaged |
+| [4/8] | `javac --release 8` compiles all of `core/src` -> `jar` | Prints the class count |
+| [5/8] | `d8 --min-api 24 --release` produces `classes.dex` | |
+| [6/8] | `apktool b -p core/framework -o core/build/unsigned.apk core/work/v35` | Log at `core/logs/build-apktool.log` |
+| [7/8] | `inject_dex.py` appends `classes.dex` to the APK as **`classes4.dex`** | Append-only: existing dex and `.so` entries are never rewritten, which keeps the huge `.so` entries `stored` (uncompressed) |
+| [8/8] | `zipalign -f -p 4` + `apksigner sign` (v1+v2) | `-NoSign` stops before signing to leave an unsigned package |
 
-构建脚本刻意**没有**用 `$ErrorActionPreference = "Stop"`：`javac`/`d8`/`apksigner`
-会把警告写到 stderr，Stop 模式下 PowerShell 会把原生命令的 stderr 当成终止错误。
-每一步都显式检查 `$LASTEXITCODE`。
-
----
-
-## 5. 管理器往 APK 里加了什么（自己核对）
-
-用 `pwsh -File core/tools/verify_apk.ps1` 会自动查这些（G1–G9 全 0 才算通过）：
-
-* `classes4.dex` 存在，且原有 dex / `.so` 条目没被重写（`.so` 仍是 `stored`）；
-* `AndroidManifest.xml` 里有 `MyGame`、`ModManagerActivity`、`ModImportActivity`；
-* `res` 里有 `ffm_mm_*` 等管理器文案，且中/日译文能查出来（`自定义地图`、`カスタムマップ`）；
-* `zipalign`、`apksigner` 校验通过，包名 `com.windowsgames.firefight.mod`、`versionCode 13200`。
+The build script deliberately does **not** set `$ErrorActionPreference = "Stop"`:
+`javac`/`d8`/`apksigner` write warnings to stderr, and in Stop mode PowerShell treats a
+native command's stderr as a terminating error. Every step checks `$LASTEXITCODE`
+explicitly.
 
 ---
 
-## 6. 常见问题
+## 5. What the manager adds to the APK (verify it yourself)
 
-**装不上 / 提示签名冲突。** 你手上的游戏与要装的包签名不同。先在设备上卸载旧包再装，
-或用同一把证书给你的包签名（`-Keystore`）。
+`pwsh -File core/tools/verify_apk.ps1` checks all of this automatically (G1-G9 must all be 0
+to pass):
 
-**启动后只有提示框，或者 15 秒后直接进游戏。** 这是预期行为：提示框选「否」或超时都会
-直接进游戏；选「是」才进管理器。想改默认行为见 `MyGame.java`。
-
-**管理器里看不到模组/地图。** 管理器读的是游戏沙盒下的模组目录，只显示「已安装」的自定义
-模组与地图；没有任何自定义内容时列表为空并显示占位文案。先用游戏自带的导入功能或管理器的
-「导入模组」放一份进去。
-
-**设备是 Android 11+ 且管理器读写不了外部目录。** 游戏清单里已声明
-`MANAGE_EXTERNAL_STORAGE`，首次进入时系统会引导去授权；管理器里「关于管理器 → 权限」
-也提供了跳转。
-
-**apktool 报 `Could not create framework directory: C:\Users\<你>\AppData\Local\apktool\framework`。**
-说明它想写默认框架目录但没有权限。本项目的脚本一律传 `-p core/framework`，不碰那个目录。
-
-**磁盘不够 / 想只出未签名包。** `pwsh -File core/tools/build.ps1 -NoSign`。
+* `classes4.dex` exists and the original dex / `.so` entries were not rewritten (`.so` is
+  still `stored`);
+* `AndroidManifest.xml` contains `MyGame`, `ModManagerActivity`, `ModImportActivity`;
+* `res` contains the manager strings such as `ffm_mm_*`, and the Chinese/Japanese
+  translations can be found (`自定义地图`, `カスタムマップ`);
+* `zipalign` and `apksigner` validation passes, package `com.windowsgames.firefight.mod`,
+  `versionCode 13200`.
 
 ---
 
-## 7. 回滚
+## 6. Common problems
 
-管理器不修改游戏原包的 dex 与资源，全部改动都在工作树里。想回到原状：
+**It will not install / signature conflict.** The game you have and the package you are
+installing were signed with different keys. Uninstall the old package on the device first, or
+sign your package with the same certificate (`-Keystore`).
+
+**After launching I only see the prompt, or the game starts after 15 seconds.** That is the
+intended behaviour: "No" or the timeout goes straight into the game, only "Yes" opens the
+manager. To change the default, see `MyGame.java`.
+
+**No mods/maps in the manager.** The manager reads the mod directory inside the game sandbox
+and only lists *installed* custom mods and maps; with no custom content the list is empty and
+shows a placeholder. Put something there first, using the game's own import or the manager's
+"Import mod".
+
+**Android 11+ and the manager cannot read/write external directories.** The game manifest
+already declares `MANAGE_EXTERNAL_STORAGE`; the system offers the grant on first entry, and
+"About -> Permissions" in the manager jumps to it too.
+
+**apktool reports `Could not create framework directory: C:\Users\<you>\AppData\Local\apktool\framework`.**
+It wants to write the default framework directory but has no permission. This project's
+scripts always pass `-p core/framework` and never touch that directory.
+
+**Not enough disk / only want an unsigned package.** `pwsh -File core/tools/build.ps1 -NoSign`.
+
+---
+
+## 7. Rolling back
+
+The manager does not modify the original APK's dex or resources; all changes live in the
+worktree. To go back:
 
 ```powershell
-# 直接用自己的原始 APK 重装
+# reinstall your own original APK
 adb install -r "D:\APK\Sean's 13.2.0_Mod_v35(1).apk"
-# 或彻底清掉
+# or wipe everything
 Remove-Item -Recurse -Force core\work, core\build, out
 ```
 
-`core/backup/MyGame.smali.orig` 保留着被替换掉的旧入口 smali，需要手工还原工作树时用它。
+`core/backup/MyGame.smali.orig` holds the replaced old entry-point smali, for when you need
+to restore the worktree by hand.

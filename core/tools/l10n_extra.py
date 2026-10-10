@@ -6,12 +6,12 @@
 """
 
 EN_EXTRA = [
-    # 需求③⑤：主菜单 + 合并后的模组管理器
+    # Requirements 3 and 5: main menu + the merged mod manager
     ("menu_maps", "Custom maps"),
     ("pack_browse", "[ Browse files ]"),
     ("msg_packs_hint", "Mod folder = "),
 
-    # 需求②：语言切换
+    # Requirement 2: language switch
     ("btn_lang", "Language"),
     ("btn_back", "[ Back ]"),
     ("title_lang", "Interface language"),
@@ -19,11 +19,11 @@ EN_EXTRA = [
     ("about_lang_now", "Interface language"),
     ("msg_lang_hint", "Pick the language used by this manager. The game itself is unchanged."),
 
-    # 需求①：关于页新增按钮
+    # Requirement 1: new buttons on the About page
     ("about_site_btn", "Open game website"),
     ("about_github_btn", "Open author GitHub"),
 
-    # 需求⑦：自定义地图
+    # Requirement 7: custom maps
     ("title_maps", "Custom maps"),
     ("menu_map_dir", "Map directory"),
     ("about_mapdir", "Map directory"),

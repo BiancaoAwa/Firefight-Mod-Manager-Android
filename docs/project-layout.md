@@ -1,64 +1,69 @@
-# 目录约定
+# Directory conventions
 
-## 1. 顶层只放两类目录
+**English** | [中文](../zh-CN/project-layout.md)
+
+## 1. Two top-level directories only
 
 ```
 Firefight-Mod-Manager-Android/
-├── core/        全部「代码与资源」：源码、桩、随包资源、脚本、构建工作区
-├── docs/        全部文档
-├── README.md    入口
+├── core/        everything "code and data": sources, stub, packaged assets, scripts, build workspace
+├── docs/        all documentation
+├── README.md    entry point
 ├── LICENSE      GPL-3.0
 └── .gitignore
 ```
 
-没有 `build/`、`out/`、`_docs/`、`_dl/` 这些散落目录：凡是构建出来的东西都在 `core/` 里
-各自的位置，凡是写给人看的都在 `docs/` 里。文档入口只有 `README.md`，它链到 `docs/`。
+There are no scattered `build/`, `out/`, `_docs/` or `_dl/` directories: everything the
+build produces lives in its own place under `core/`, everything written for humans lives
+under `docs/`. The only documentation entry point is `README.md`, which links into `docs/`.
 
-## 2. core/ 里各目录的职责
+## 2. What each directory under core/ is for
 
-| 目录 | 内容 | 进仓库？ |
+| Directory | Contents | Committed? |
 | --- | --- | --- |
-| `core/src/` | 管理器 Java 源码（`com/windowsgames/firefight/*.java`） | ✅ |
-| `core/stub/` | 编译期桩（`org/libsdl/app/SDLActivity.java`），不进包 | ✅ |
-| `core/assets/` | 随包发布的资源（示例模组 `Mod/`） | ✅ |
-| `core/tools/` | 全部脚本（PowerShell + Python） | ✅ |
-| `core/work/` | 反编译出来的游戏工作树（`work/v35/`） | ❌ 生成物，几百 MB |
-| `core/build/` | javac/d8/apktool 中间产物 | ❌ |
-| `core/framework/` | apktool 框架文件 `1.apk`（可从 apktool jar 现取） | ❌ |
-| `core/backup/` | 被替换掉的旧 `MyGame.smali` 等备份 | ❌（可留作参考，但属于本地状态） |
-| `core/keystore/` | 自动生成的调试证书 | ❌ 绝不进仓库 |
-| `core/logs/` | 构建/反编译日志 | ❌ |
-| `out/` | 构建产物 APK | ❌ |
+| `core/src/` | Manager Java sources (`com/windowsgames/firefight/*.java`) | ✅ |
+| `core/stub/` | Compile-time stub (`org/libsdl/app/SDLActivity.java`), never packaged | ✅ |
+| `core/assets/` | Assets shipped with the package (sample mods under `Mod/`) | ✅ |
+| `core/tools/` | All scripts (PowerShell + Python) | ✅ |
+| `core/work/` | Decoded game worktree (`work/v35/`) | ❌ generated, hundreds of MB |
+| `core/build/` | javac/d8/apktool intermediates | ❌ |
+| `core/framework/` | apktool framework file `1.apk` (can be extracted from the apktool jar) | ❌ |
+| `core/backup/` | Backups of replaced files such as the original `MyGame.smali` | ❌ (kept for reference, but it is local state) |
+| `core/keystore/` | Auto-generated debug certificate | ❌ never commit |
+| `core/logs/` | Build/decode logs | ❌ |
+| `out/` | Built APK artifacts | ❌ |
 
-`.gitignore` 已经把上面 ❌ 的全部排除。**仓库里只有源码、脚本和文档，小于 1 MB。**
+`.gitignore` already excludes everything marked ❌ above. **The repository contains only
+sources, scripts and documentation, less than 1 MB.**
 
-## 3. 为什么不把工作树放进仓库
+## 3. Why the worktree is not committed
 
-`core/work/v35/` 是从用户自备的交战 APK 反编译出来的（约 340 MB，含游戏自己的
-`res`、`lib/*.so`、`assets`），既大又不该由本项目分发。它由
-`core/tools/prepare_work.ps1` 在本地现场生成：
+`core/work/v35/` is decoded from the user's own Firefight APK (about 340 MB, including the
+game's own `res`, `lib/*.so` and `assets`): it is large and this project must not
+redistribute it. It is generated locally by `core/tools/prepare_work.ps1`:
 
 ```powershell
-pwsh -File core/tools/prepare_work.ps1 -GameApk <你的交战 APK>
+pwsh -File core/tools/prepare_work.ps1 -GameApk <your Firefight APK>
 ```
 
-生成之后，管理器需要的改动（清单里两个 Activity、示例模组、删旧 smali）由
-`patch_worktree.py` 幂等补齐。
+After decoding, the changes the manager needs (two activities in the manifest, the sample
+mods, removal of the old smali) are applied idempotently by `patch_worktree.py`.
 
-## 4. 新东西该放哪
+## 4. Where to put new things
 
-| 你要加的东西 | 放哪 |
+| What you are adding | Where |
 | --- | --- |
-| 管理器的一个新界面 / 逻辑 | `core/src/com/windowsgames/firefight/`，需要的话在 `ModManagerActivity` 里挂事件 |
-| 一句新文案 | `core/tools/l10n_round3.py`（或 `l10n_extra.py`），键名 `ffm_mm_*` |
-| 一个新的构建/验证步骤 | `core/tools/`，PowerShell 脚本引 `common.ps1` 取路径与工具链 |
-| 一份说明 | `docs/`，并在 `README.md` 的文档表里加一行 |
-| 随包的示例数据 | `core/assets/`（会被 `patch_worktree.py` 同步进工作树） |
+| A new manager screen / logic | `core/src/com/windowsgames/firefight/`, wire events in `ModManagerActivity` if needed |
+| A new UI string | `core/tools/l10n_round3.py` (or `l10n_extra.py`), key name `ffm_mm_*` |
+| A new build/verification step | `core/tools/`, PowerShell scripts take paths and toolchain from `common.ps1` |
+| A document | `docs/` (and `docs/zh-CN/`), plus a row in the README documentation table |
+| Sample data shipped in the package | `core/assets/` (synced into the worktree by `patch_worktree.py`) |
 
-## 5. 编码约定
+## 5. Coding conventions
 
-* Java：`--release 8`，不引入任何第三方依赖；界面全部用代码构建（没有 XML 布局资源），
-  文案一律走 `L10n.t(...)`。
-* 脚本：PowerShell 7（`pwsh`），路径从 `common.ps1` 取，不写死绝对路径；
-  工具链找不到要说清楚缺什么。
-* 文案数据：Python 字典，`("key", "value")` 元组列表 + 各语种字典，缺键回落英文。
+* Java: `--release 8`, no third-party dependencies; the whole UI is built in code (there
+  are no XML layout resources), every string goes through `L10n.t(...)`.
+* Scripts: PowerShell 7 (`pwsh`), paths come from `common.ps1`, no hard-coded absolute
+  paths; when the toolchain is missing, say exactly what is missing.
+* String data: Python dictionaries, a list of `("key", "value")` tuples plus one dict per
+  language; missing keys fall back to English.
