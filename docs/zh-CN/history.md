@@ -169,6 +169,26 @@ Python 走 `tokenize` 只删 `COMMENT`，PowerShell 逐行做引号感知），�
 
 ---
 
+## 第 10 轮：改用 AOSP 公开 testkey 作为默认签名
+
+**问题**：之前的包用的是本机生成的调试证书，而游戏和官方打包器用的是 AOSP 公开 testkey，
+测试包无法与任何可复现的签名对上。
+
+**改法**：把 `core/keystore/testkey.jks`（别名与口令都是 `testkey`，与官方交战模组打包器
+`keys/testkey.jks` 是同一把）收进仓库，没给 `-Keystore` 时自动用它；自己生成的调试证书只作
+兜底。`build.ps1` 增加 `-KsPass` / `-KeyAlias` / `-KeyPass` 并打印实际使用的证书，
+`.gitignore` 忽略 `core/keystore/*` 但保留 testkey。
+
+**结果**：`build.ps1 -OutName ...-testkey.apk` → `BUILD OK`；
+`apksigner verify --print-certs` 显示证书 SHA-256
+`a40da80a59d170caa950cf15c18c454d47a39b26989d8b640ecd745ba71bf5dc`；
+`verify_apk.ps1` → `RESULT: PASS`。
+
+**本轮定下的约定**：发到 GitHub 上的一切（仓库简介、提交信息、PR 标题与正文、Issue）都用英文；
+文档保留中文版放在 `docs/zh-CN/`。
+
+---
+
 ## 踩过的坑（速查）
 
 | 坑 | 教训 |
