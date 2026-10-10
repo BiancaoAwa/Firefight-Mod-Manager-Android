@@ -57,10 +57,12 @@ and passes it to `apktool -p`. (This framework file matches the one in the offic
 release, SHA-256
 `5DD984016ED5A5EB0EEF866E2C6E8CD352E1427828EC23ADB18005CF5648F3D7`, 4,488,013 bytes.)
 
-You do not need to prepare a signing keystore either: without `-Keystore` the script uses
-`keytool` to create an `androiddebugkey` (password `android`) at
-`core/keystore/debug.keystore`. That is a debug signature only; use your own certificate to
-publish.
+You do not need to prepare a signing keystore either. Without `-Keystore` the script signs with
+the public AOSP testkey shipped in the repository (`core/keystore/testkey.jks`, alias and
+password both `testkey`, the same key the official Firefight mod packager uses); if that file
+is absent it falls back to `keytool` creating an `androiddebugkey` (password `android`) at
+`core/keystore/debug.keystore`. Both are test signatures only — use your own certificate
+(`-Keystore` / `-KsPass` / `-KeyAlias` / `-KeyPass`) to publish.
 
 ### 2.3 Disk and system
 

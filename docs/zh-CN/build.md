@@ -26,7 +26,8 @@ pwsh -File core/tools/prepare_work.ps1 -GameApk <你的交战 APK> [-Force] [-Sk
 
 # 构建
 pwsh -File core/tools/build.ps1 [-JdkHome <dir>] [-AndroidSdk <dir>] [-ApktoolJar <jar>]
-                                [-Python <exe>] [-Keystore <file>] [-OutName <name>] [-NoSign]
+                                [-Python <exe>] [-Keystore <file>] [-KsPass <pw>]
+                                [-KeyAlias <name>] [-KeyPass <pw>] [-OutName <name>] [-NoSign]
 
 # 验证
 pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk <dir>] [-Python <exe>]
@@ -42,7 +43,8 @@ pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk
 | build-tools | SDK 下 `build-tools\*` 里版本号最大且含 `d8.bat` 的一个 |
 | apktool | `-ApktoolJar` → `APKTOOL_JAR` → `core\tools\apktool.jar` → `core\tools\apktool*.jar` → `Downloads\apktool*.jar` |
 | Python | `-Python` → PATH 上的 `python` / `python3` / `py` |
-| 签名证书 | `-Keystore` → `core\keystore\debug.keystore`（不存在就用 `keytool` 现生成） |
+| 签名证书 | `-Keystore` → `core\keystore\testkey.jks`（AOSP 公开测试密钥，别名与口令都是 `testkey`）→ `core\keystore\debug.keystore`（不存在就用 `keytool` 现生成） |
+| 口令 / 别名 | `-KsPass` / `-KeyAlias` / `-KeyPass`；不给就按选中的证书取默认值（`testkey`，或 `android` + `androiddebugkey`） |
 | apktool 框架 | 每次构建前用 `Ensure-Framework` 从 apktool jar 里取 `prebuilt/android-framework.jar` → `core/framework/1.apk` |
 
 找不到任何一个都会明确报出「装什么 / 用哪个参数指定」并退出，不会半路失败。
