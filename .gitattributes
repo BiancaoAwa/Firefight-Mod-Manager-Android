@@ -1,4 +1,4 @@
-# 统一换行：文本文件一律 LF，二进制不要碰
+# One line-ending policy: text files use LF, binary files are left alone
 * text=auto eol=lf
 
 *.zip  binary
