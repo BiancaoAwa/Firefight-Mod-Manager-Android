@@ -1,4 +1,4 @@
-# Build the patched APK into out/ in 8 steps (strings, dex, apktool, sign).
+# Build the patched APK in 8 steps (strings, dex, apktool, sign).
 
 [CmdletBinding()]
 param(
@@ -10,11 +10,16 @@ param(
     [string]$KsPass = "",
     [string]$KeyAlias = "",
     [string]$KeyPass = "",
+    [string]$OutDir = "",
     [string]$OutName = "Firefight-Mod-Manager-13.2.0-mgr0.1.0.apk",
     [switch]$NoSign
 )
 
+$requestedOutDir = $OutDir
+
 . "$PSScriptRoot\common.ps1"
+
+if ($requestedOutDir) { $OutDir = [System.IO.Path]::GetFullPath($requestedOutDir) }
 
 foreach ($d in @($BuildDir, $OutDir, $LogDir, $BakDir)) {
     New-Item -ItemType Directory -Force -Path $d | Out-Null

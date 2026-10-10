@@ -27,11 +27,13 @@ pwsh -File core/tools/prepare_work.ps1 -GameApk <你的交战 APK> [-Force] [-Sk
 # 构建
 pwsh -File core/tools/build.ps1 [-JdkHome <dir>] [-AndroidSdk <dir>] [-ApktoolJar <jar>]
                                 [-Python <exe>] [-Keystore <file>] [-KsPass <pw>]
-                                [-KeyAlias <name>] [-KeyPass <pw>] [-OutName <name>] [-NoSign]
+                                [-KeyAlias <name>] [-KeyPass <pw>] [-OutDir <dir>] [-OutName <name>] [-NoSign]
 
 # 验证
 pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk <dir>] [-Python <exe>]
 ```
+
+签名后的 APK 默认写进仓库里的 `out/`（已被 git 忽略）；想放到别处就传 `-OutDir <dir>`。
 
 ## 2. 工具链怎么找的
 
