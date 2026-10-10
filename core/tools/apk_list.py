@@ -1,11 +1,8 @@
-# -*- coding: utf-8 -*-
-"""List the entries inside an APK (optionally filtered by keyword) without unpacking it.
+"""List the entries of an APK, optionally filtered by substring.
 
-Usage: python tools/apk_list.py <apk> [substring1 substring2 ...]
-"""
+Usage: python apk_list.py <apk> [substring ...]"""
 import sys
 import zipfile
-
 
 def main():
     apk = sys.argv[1]
@@ -25,7 +22,6 @@ def main():
             print("\nTop-level distribution:")
             for k, v in sorted(top.items(), key=lambda kv: -kv[1])[:30]:
                 print("  %-40s %d" % (k, v))
-
 
 if __name__ == "__main__":
     main()

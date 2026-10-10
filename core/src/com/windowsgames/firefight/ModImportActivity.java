@@ -13,10 +13,11 @@ import android.widget.Toast;
 import java.io.InputStream;
 
 /**
- * Lightweight import entry point (requirement 3, "other ways in and out"):
- * when the user selects a .zip / .ffmod mod package in a file manager or the share menu via "Open with",
- * go straight to the import confirmation without starting the SDL game itself.
+ * Activity that receives a mod file shared into the app or picked from the manager and imports it
+ * into the mod library.
+ * Not implemented: importing several files at once.
  */
+
 public class ModImportActivity extends Activity implements DialogInterface.OnClickListener {
 
     private Uri uri;
@@ -83,7 +84,7 @@ public class ModImportActivity extends Activity implements DialogInterface.OnCli
                 final String r;
                 try {
                     InputStream in = getContentResolver().openInputStream(uri);
-                    r = ModImporter.installZip(in, ModImporter.modRoot(ModImportActivity.this), name);
+                    r = ModImporter.importMod(ModImportActivity.this, in, name);
                 } catch (Throwable t) {
                     ui.post(new Runnable() {
                         public void run() {

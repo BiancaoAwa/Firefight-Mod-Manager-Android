@@ -1,15 +1,6 @@
-# Firefight Mod Manager -- shared environment detection for the build scripts
-# Dot-sourced by build.ps1 and prepare_work.ps1; not meant to run on its own.
-#
-# All paths are relative to this repository, with no hard-coded user name:
-#   <repo>/                      repository root
-#   <repo>/core/                 sources and tools (core/src, core/stub, core/tools, core/assets)
-#   <repo>/core/work/v35         the decoded Firefight project (not committed, created by prepare_work.ps1)
-#   <repo>/core/framework/1.apk  apktool framework file (not committed, extracted from the apktool jar)
-#   <repo>/core/build/           intermediate artifacts (not committed)
-#   <repo>/out/                  final APKs (not committed)
+# Shared helpers: default paths and toolchain discovery.
 
-$ErrorActionPreference = "Continue"   # not Stop: a native command's stderr would be treated as a terminating error
+$ErrorActionPreference = "Continue"
 
 $ToolsDir = $PSScriptRoot
 $CoreDir  = Split-Path -Parent $ToolsDir
@@ -33,8 +24,6 @@ function Get-VerKey([string]$n) {
     if ($m.Success) { try { return [version]$m.Value } catch { return [version]'0.0' } }
     return [version]'0.0'
 }
-
-# ------------------------------------------------------------------ tool detection
 
 function Resolve-JdkHome([string]$explicit) {
     $cand = @()
@@ -105,10 +94,6 @@ function Resolve-Python([string]$explicit) {
     return ""
 }
 
-# ------------------------------------------------------------------ dependency preparation
-
-# apktool 3.x bundles prebuilt/android-framework.jar; extracting it yields the 1.apk in the framework directory.
-# That way the repository does not carry a 4 MB framework file and a fresh clone generates it on the first run.
 function Ensure-Framework([string]$apktoolJar, [string]$dir) {
     $dst = Join-Path $dir "1.apk"
     if (Test-Path $dst) { return $dst }
@@ -118,8 +103,7 @@ function Ensure-Framework([string]$apktoolJar, [string]$dir) {
     try {
         $e = $zip.GetEntry("prebuilt/android-framework.jar")
         if (-not $e) {
-# Note: these messages must go through Write-Host, never Write-Output -- this function returns a path,
-# and a stray string would make the caller receive an array, skewing the command line built later.
+
 Write-Host "  no prebuilt/android-framework.jar inside the apktool jar (apktool too old?)"
 Write-Host "  Please run manually: java -jar $apktoolJar if -p `"$dir`" <framework-res.apk>"
             return ""
@@ -132,7 +116,6 @@ Write-Host "  extracted the framework file from apktool: $dst ($((Get-Item $dst)
     return $dst
 }
 
-# Generate a debug signing certificate when there is none (keytool ships with the JDK), avoiding a dependency on another machine.
 function Ensure-Keystore([string]$jdk, [string]$path) {
     if (Test-Path $path) { return $path }
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null

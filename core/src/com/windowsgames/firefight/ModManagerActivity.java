@@ -28,17 +28,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Round 3: full-screen mod manager UI (three tabs).
- *
- * Spec (user m01133):
- *   - Mods: installed count / total size; mod0 (the one currently enabled) shows Disable / Delete, mod1-4 show Enable|Disable / Delete;
- *     deletion asks for confirmation; the last row is "Import mod". Five slots are shared, extra mods are not shown.
- *   - Maps: installed count / total size; the name comes from <name> in ****-scenarios.txt, falling back to the 4-character code;
- *     9 per page with automatic paging; the last row is "Import map".
- *   - About: metadata / website / GitHub repository / author GitHub / Bilibili / Afdian / e-mail.
- *
- * The whole UI is built in code, with no new res/layout -- the build chain then only compiles values resources, one failure point less.
+ * The manager screen: a title bar with the language switch and the return button, plus the three
+ * tabs mods / maps / about.
+ * Not implemented: editing a mod in place, search.
  */
+
 public class ModManagerActivity extends Activity implements View.OnClickListener {
 
     public static final String VERSION = "0.1.0";
@@ -85,6 +79,9 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     private static final int ID_SLOT_ON = 100;
     private static final int ID_SLOT_DEL = 200;
     private static final int ID_MAP_ROW = 300;
+    private static final int ID_MAP_ON = 400;
+    private static final int ID_MAP_UP = 500;
+    private static final int ID_MAP_DOWN = 600;
 
     private final Button[] tabs = new Button[3];
     private LinearLayout content;
@@ -98,8 +95,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
 
     private List<ModImporter.Slot> slots = new ArrayList<ModImporter.Slot>();
     private List<MapImporter.MapEntry> maps = new ArrayList<MapImporter.MapEntry>();
-
-    // ------------------------------------------------------------ lifecycle
 
     protected void onCreate(Bundle savedInstanceState) {
         try {
@@ -158,16 +153,8 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    // ------------------------------------------------------------ skeleton
-
     private View buildRoot() {
-        // Structure: the whole-screen scrollable ScrollView IS the content view itself.
-        //
-        // Why not "root LinearLayout + a scroll area as a child": on a real device the content container
-        // was measured with 0 available height on the first frame (ch=0), so every child that had been added
-        // ended up 0 high -> a blank block; tapping a tab rebuilt the children and re-ran the measurement,
-        // which is why the content "came out by tapping". Now the window hands the ScrollView the full screen
-        // height (EXACTLY) and the ScrollView measures the inner LinearLayout with UNSPECIFIED height, so the inner layout and its children can only take their natural height and the container cannot collapse to 0 again.
+
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
         sv.setBackgroundColor(Ui.bg(this));
@@ -178,7 +165,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
         rootBox = root;
 
-        // Title bar: the title takes the remaining width, with "Language" and "Back" on its right.
         LinearLayout head = Ui.row(this);
         head.addView(Ui.title(this, t("mm_title")), Ui.weight(1f));
         Button lang = Ui.headerAction(this, t("mm_lang"));
@@ -209,7 +195,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
             bar.addView(b, Ui.weight(1f));
         }
         root.addView(bar, Ui.fill());
-        // The divider carries its own LayoutParams; do not let Ui.fill() override it to 0 height (the line would vanish).
+
         root.addView(Ui.divider(this), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(this, 1))));
 
@@ -223,10 +209,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         stat.setText(base == null ? "" : base);
     }
 
-    /**
-     * Post-first-frame self check: when the content area is still 0 high (some devices skip measuring the
-     * inner layout on the first frame), rebuilding the current page once restores it; normally this branch is never taken.
-     */
     private void settleLayout() {
         if (rootBox == null) {
             return;
@@ -263,8 +245,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    // ------------------------------------------------------------ mods page
-
     private void showMods() {
         content.removeAllViews();
         slots = ModImporter.listSlots(this);
@@ -286,6 +266,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         if (slots.size() > MAX_SLOTS) {
             content.addView(Ui.small(this, t("mm_mods_slots_note")), Ui.fill());
         }
+        content.addView(Ui.small(this, t("mm_mods_one_note")), Ui.fill());
         content.addView(Ui.spacer(this, 6));
         content.addView(button(ID_IMPORT_MOD, t("mm_btn_import_mod")), Ui.fill());
         content.addView(Ui.spacer(this, 4));
@@ -325,6 +306,9 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                     public void run() {
                         toast(ok ? t(on ? "mm_enable_ok" : "mm_disable_ok") : t("mm_op_failed"));
                         showTab(TAB_MODS);
+                        if (ok) {
+                            promptRestart();
+                        }
                     }
                 });
             }
@@ -341,11 +325,12 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                 final boolean ok = ModImporter.deleteSlot(getApplicationContext(), s);
                 toast(ok ? t("mm_deleted") : t("mm_del_failed"));
                 showTab(TAB_MODS);
+                if (ok) {
+                    promptRestart();
+                }
             }
         });
     }
-
-    // ------------------------------------------------------------ maps page
 
     private void showMaps() {
         content.removeAllViews();
@@ -384,6 +369,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         pager.addView(num, Ui.weight(1f));
         pager.addView(next, Ui.weight(1f));
         content.addView(pager, Ui.fill());
+        content.addView(Ui.small(this, t("mm_map_order_hint")), Ui.fill());
 
         if (maps.isEmpty()) {
             content.addView(Ui.small(this, t("mm_no_maps")), Ui.fill());
@@ -392,7 +378,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         int from = page * PAGE_SIZE;
         int to = Math.min(maps.size(), from + PAGE_SIZE);
         for (int i = from; i < to; i++) {
-            content.addView(mapRow(i, maps.get(i)), cardLp());
+            content.addView(mapRow(i - from, maps.get(i)), cardLp());
         }
         content.addView(Ui.spacer(this, 6));
         content.addView(button(ID_IMPORT_MAP, t("mm_btn_import_map")), Ui.fill());
@@ -405,10 +391,56 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         box.addView(Ui.strong(this, e.display(this)), Ui.fill());
         box.addView(Ui.small(this, e.code + "  ·  " + e.sizeText()
                 + "  ·  " + e.state(this)), Ui.fill());
+        LinearLayout btns = Ui.row(this);
+        Button on = Ui.button(this, e.listed ? t("mm_btn_disable") : t("mm_btn_enable"));
+        on.setId(ID_MAP_ON + index);
+        on.setOnClickListener(this);
+        Button up = Ui.button(this, t("mm_map_up"));
+        up.setId(ID_MAP_UP + index);
+        up.setOnClickListener(this);
+        Button down = Ui.button(this, t("mm_map_down"));
+        down.setId(ID_MAP_DOWN + index);
+        down.setOnClickListener(this);
+        btns.addView(on, Ui.weight(1f));
+        btns.addView(up, Ui.weight(1f));
+        btns.addView(down, Ui.weight(1f));
+        box.addView(btns, Ui.fill());
         box.setId(ID_MAP_ROW + index);
         box.setClickable(true);
         box.setOnClickListener(this);
         return box;
+    }
+
+    private void toggleMap(final int index) {
+        if (index < 0 || index >= maps.size()) {
+            return;
+        }
+        final MapImporter.MapEntry e = maps.get(index);
+        final boolean on = !e.listed;
+        boolean ok = on
+                ? MapImporter.registerCode(this, e.code)
+                : MapImporter.unregisterCode(this, e.code);
+        LogStore.event(this, "map " + e.code + " -> " + (on ? "enabled " : "disabled ") + ok);
+        toast(ok ? t(on ? "mm_enable_ok" : "mm_disable_ok") : t("mm_op_failed"));
+        showTab(TAB_MAPS);
+        if (ok) {
+            promptRestart();
+        }
+    }
+
+    private void moveMap(final int index, final int delta) {
+        if (index < 0 || index >= maps.size()) {
+            return;
+        }
+        final MapImporter.MapEntry e = maps.get(index);
+        boolean ok = MapImporter.moveCode(this, e.code, delta);
+        if (!ok) {
+            toast(t("mm_op_failed"));
+            return;
+        }
+        LogStore.event(this, "map " + e.code + " move " + delta);
+        showTab(TAB_MAPS);
+        promptRestart();
     }
 
     private void mapActions(final MapImporter.MapEntry e) {
@@ -429,6 +461,9 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                                                 toast("ok".equals(r)
                                                         ? t("mm_deleted") : t("mm_del_failed"));
                                                 showTab(TAB_MAPS);
+                                                if ("ok".equals(r)) {
+                                                    promptRestart();
+                                                }
                                             }
                                         });
                             } else {
@@ -463,8 +498,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
             toast(b.toString());
         }
     }
-
-    // ------------------------------------------------------------ about page
 
     private void showAbout() {
         content.removeAllViews();
@@ -572,8 +605,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    // ------------------------------------------------------------ import
-
     private void pick(int req) {
         try {
             Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -645,18 +676,22 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
 
     private void afterImport(boolean isMap, String r) {
         String msg;
+        boolean ok;
         if (isMap) {
-            if (r != null && r.startsWith("ok:")) {
+            ok = r != null && r.startsWith("ok:");
+            if (ok) {
                 msg = t("mm_import_ok") + "  " + r.substring(3);
             } else {
                 msg = t("mm_import_fail");
             }
         } else if ("ok".equals(r)) {
+            ok = true;
             msg = t("mm_import_ok");
             if (ModImporter.lastInstalledId != null && ModImporter.lastInstalledId.length() > 0) {
                 msg = msg + "  " + ModImporter.lastInstalledId;
             }
         } else {
+            ok = false;
             msg = t("mm_import_fail");
         }
         toast(msg);
@@ -666,6 +701,9 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
         page = 0;
         showTab(isMap ? TAB_MAPS : TAB_MODS);
+        if (ok) {
+            promptRestart();
+        }
     }
 
     private String displayName(Uri uri) {
@@ -679,8 +717,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
         return "mod.zip";
     }
-
-    // ------------------------------------------------------------ clicks
 
     public void onClick(View v) {
         int id = v == null ? 0 : v.getId();
@@ -745,18 +781,49 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
             toggleSlot(id - ID_SLOT_ON);
         } else if (id >= ID_SLOT_DEL && id < ID_SLOT_DEL + MAX_SLOTS) {
             askDeleteMod(id - ID_SLOT_DEL);
-        } else if (id >= ID_MAP_ROW && id < ID_MAP_ROW + 1000) {
-            int i = id - ID_MAP_ROW;
+        } else if (id >= ID_MAP_ON && id < ID_MAP_ON + PAGE_SIZE) {
+            toggleMap(page * PAGE_SIZE + id - ID_MAP_ON);
+        } else if (id >= ID_MAP_UP && id < ID_MAP_UP + PAGE_SIZE) {
+            moveMap(page * PAGE_SIZE + id - ID_MAP_UP, -1);
+        } else if (id >= ID_MAP_DOWN && id < ID_MAP_DOWN + PAGE_SIZE) {
+            moveMap(page * PAGE_SIZE + id - ID_MAP_DOWN, 1);
+        } else if (id >= ID_MAP_ROW && id < ID_MAP_ROW + PAGE_SIZE) {
+            int i = page * PAGE_SIZE + id - ID_MAP_ROW;
             if (i >= 0 && i < maps.size()) {
                 mapActions(maps.get(i));
             }
         }
     }
 
-    // ------------------------------------------------------------ small helpers
-
     private String t(String key) {
         return L10n.t(this, key, key);
+    }
+
+    private void promptRestart() {
+        try {
+            new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle(t("mm_restart_title"))
+                    .setMessage(t("mm_restart_msg"))
+                    .setPositiveButton(t("mm_restart_now"), new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface d, int which) {
+                            restartGame();
+                        }
+                    })
+                    .setNegativeButton(t("mm_ok"), null)
+                    .show();
+        } catch (Throwable t) {
+            toast(t("mm_restart_title"));
+        }
+    }
+
+    private void restartGame() {
+        try {
+            Intent i = new Intent(this, MyGame.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(i);
+        } catch (Throwable t) {
+        }
+        finish();
     }
 
     private LinearLayout.LayoutParams cardLp() {
@@ -846,7 +913,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    /** Diagnostics: meant to be pasted into a bug report. */
     private String diag() {
         StringBuilder b = new StringBuilder();
         b.append("version: ").append(VERSION).append(" (").append(BUILD).append(")\n");
@@ -866,8 +932,4 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         return b.toString();
     }
 
-    /**
-     * Layout note: the whole screen is one ScrollView (see the comment in buildRoot), so the round-5 fallback
-     * measuring class that treated AT_MOST as EXACTLY is no longer needed.
-     */
 }

@@ -10,8 +10,8 @@
 | `MyGame` | ~170 | **新的启动 Activity**，`extends SDLActivity`。`onCreate` 里先调 `super`（游戏照常初始化），再弹提示框：选「是」拉起 `ModManagerActivity`，选「否」或 `PROMPT_SECONDS = 15` 秒倒计时结束就继续游戏。同时提供 `rootOfStatic(Context)` —— 全项目唯一的「沙盒根目录」入口 |
 | `ModManagerActivity` | ~860 | 管理器主界面（三个页签 + 标题栏 + 统计行），也是所有按钮的点击分派中心 |
 | `ModImportActivity` | ~120 | 透明/对话框式 Activity，接收 `VIEW`/`SEND` 的 `application/zip`，把模组包交给 `ModImporter` 导入后退出 |
-| `ModImporter` | ~885 | 模组的全部文件逻辑：枚举槽位、读名字、启用/禁用（`Mod/` ↔ `Mod-disabled/` 搬运）、导入（内置 assets / 外部 zip / 单顶层目录剥离）、备份与元信息 |
-| `MapImporter` | ~690 | 自定义地图的导入与登记：解压到 `Custom Maps/<CODE>/`、把 `<CODE>` 追加进 `CustomMapCodeNames.txt`、读 `-scenarios` 里的 `<name>`、按页切分 |
+| `ModImporter` | ~1000 | 模组的全部文件逻辑：`Mod/` 只放当前启用模组的裸文件（不套 `<id>/`），未启用的放在 `Mod-disabled/<id>/`，活动 id 记在 `Mod-disabled/.ffm-enabled`；启用新模组会自动把旧的搬回库（同一时间只有一个）；另有导入（内置 assets / 外部 zip / 单顶层目录剥离）、备份与元信息 |
+| `MapImporter` | ~740 | 自定义地图：解压到 `Custom Maps/<CODE>/`、把 `<CODE>` 登记进 `CustomMapCodeNames.txt`（有行=启用，删行=禁用）、按该文件行序列出地图并提供 `moveCode()` 上移/下移、读 `-scenarios` 里的 `<name>`、按页切分 |
 | `Ui` | ~205 | 控件工厂与尺寸工具：`column/row/title/subtitle/action/headerAction/tabButton/divider/weight/fill/pad/dp/...`，配色统一带 fallback（取不到主题色也不会崩） |
 | `L10n` | ~230 | 语言解析：把系统 locale 映射到 28 个语种之一，`t()` 从生成的 `ffm_strings.xml` 取值，取不到回落英文/键名 |
 | `LogStore` | ~230 | 诊断日志：写事件到 `<Download>/Firefight-Mod-Manager/<包名>/`，保留最近 `MAX_FILES = 10` 份；「关于管理器 → 复制诊断信息」就是复制它的内容 |
@@ -60,14 +60,19 @@ EXACTLY 整屏高」之后，内层布局拿到的是 UNSPECIFIED 高度，只�
 | `REQ_PICK_MOD / REQ_PICK_MAP` | 0x61 / 0x62 | 文件选择器的请求码 |
 
 模组页每行：名字（`mod.txt` 的 `<name>`，取不到显示 `NA`）+ 大小，第 0 槽显示「当前启用」；
-按钮是 启用/禁用 + 删除（删除要二次确认）。列表最后一项是「导入模组」。
-地图页最后一项是「地图导入」，底部有 上一页/下一页。
+按钮是 启用/禁用 + 删除（删除要二次确认）。列表最后一项是「导入模组」，并有一行「同一时间
+只能启用一个模组」的说明。
+
+地图页每行：代码 + 名字 + 状态（启用 / 禁用 / 目录缺失）+ 大小，按钮是 启用/禁用 + 上移 + 下移；
+最后一项是「地图导入」，底部有 上一页/下一页，并有一行「这里的顺序就是游戏中的顺序」的说明。
+
+模组或地图改动成功后都会弹「需要重启」提示框，可以直接点「立即重启」重新拉起 `MyGame`。
 
 ## 3. 多语言
 
 * 文案键统一前缀 `ffm_`，管理器界面用 `ffm_mm_*`。
-* `core/tools/l10n_data.py` / `l10n_extra.py` / `l10n_round3.py` 三份 Python 数据表是**唯一**
-  文案源；`core/tools/gen_l10n.py` 在构建时把它们合并，写出
+* `core/tools/l10n_data.py` / `l10n_extra.py` / `l10n_round3.py` / `l10n_round4.py` 四份 Python
+  数据表是**唯一**文案源；`core/tools/gen_l10n.py` 在构建时把它们合并，写出
   `core/work/v35/res/values*/ffm_strings.xml`（28 个语种 + 默认英文）。
 * `gen_l10n.py` 会扫 `core/src/**/*.java` 里所有 `t("key")`，校验每个键都有定义、
   每个语种没有多余键；缺键直接让构建失败。

@@ -20,26 +20,24 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
- * Mod package importer (requirement 5).
+ * Mod library and the flat Mod/ folder the game reads.
  *
- * Supported mod package forms:
- *   A) Bundled in the APK: assets/Mod/*.zip                -- zip holding mod.json and payload files
- *   B) Bundled in the APK: assets/Mod/<id>/mod.json        -- directory form (any subdirectories/files)
- *   C) External file: .zip / .ffmod handed over by the file picker
+ * Layout under <external files>/:
+ *   Mod/                     raw files of the one active mod, no sub-folder
+ *   Mod-disabled/<id>/       installed mods that are not active
+ *   Mod-disabled/.ffm-enabled   id of the active mod (kept out of Mod/)
+ *   Mod-disabled/.backup/<id>/<timestamp>/
+ *   Mod-disabled/installed.json
  *
- * Install layout (<modRoot> is usually files/Mod):
- *   <modRoot>/<id>/...            mod content
- *   <modRoot>/<id>/.ffm-meta      install metadata written by this manager (time / source / file count)
- *   <modRoot>/.backup/<id>/<ts>/  automatic backup taken before an overwrite install (used for rollback)
- *   <modRoot>/installed.json     index snapshot for humans and the game (derived file, never parsed)
+ * Not implemented: rollback to a backup, duplicate detection between mods, dependency checks.
  */
+
 public final class ModImporter {
 
     public static final String META = ".ffm-meta";
     public static final String BACKUP_DIR = ".backup";
     public static final String INDEX = "installed.json";
 
-    /** Description of one candidate or installed mod. */
     public static class ModEntry {
         public String id = "";
         public String name = "";
@@ -63,8 +61,6 @@ public final class ModImporter {
 
     private ModImporter() {
     }
-
-    // ---------------------------------------------------------------- helpers
 
     public static String now() {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date());
@@ -95,7 +91,6 @@ public final class ModImporter {
         return out;
     }
 
-    /** Minimal JSON lookup: find "key" in text and return the first string or number after it. Just enough. */
     public static String jsonGet(String text, String key) {
         if (text == null || key == null) {
             return "";
@@ -196,8 +191,6 @@ public final class ModImporter {
         return n;
     }
 
-    // ------------------------------------------------------- metadata I/O
-
     public static ModEntry readMeta(File modDir) {
         ModEntry e = new ModEntry();
         e.id = modDir.getName();
@@ -261,8 +254,6 @@ public final class ModImporter {
         }
     }
 
-    // ------------------------------------------------------- listing
-
     public static File modRoot(Context c) {
         File base = MyGame.rootOfStatic(c);
         if (base == null) {
@@ -275,7 +266,6 @@ public final class ModImporter {
         return root;
     }
 
-    /** Installed mods (sorted by name, hidden directories such as .backup skipped). */
     public static List<ModEntry> listInstalled(File modRoot) {
         List<ModEntry> out = new ArrayList<ModEntry>();
         if (modRoot == null || !modRoot.isDirectory()) {
@@ -299,16 +289,10 @@ public final class ModImporter {
         return out;
     }
 
-
-    // ------------------------------------------------- enable / disable (round 3)
-
-    /**
-     * Directory holding disabled mods, a sibling of Mod/. The game only reads &lt;files&gt;/Mod, so disabling
-     * can only move the mod directory away; renaming it alone may still leave it visible to the game's scan.
-     */
     public static final String DISABLED_DIR = "Mod-disabled";
 
-    /** Directory name produced by the most recent installZip, used for UI feedback. */
+    private static final String STATE = ".ffm-enabled";
+
     public static String lastInstalledId = "";
 
     public static File disabledRoot(Context c) {
@@ -323,18 +307,106 @@ public final class ModImporter {
         return root;
     }
 
-    /** One mod slot in the UI. */
+    public static String enabledId(Context c) {
+        File root = disabledRoot(c);
+        if (root == null) {
+            return "";
+        }
+        File f = new File(root, STATE);
+        if (!f.isFile()) {
+            return "";
+        }
+        try {
+            return readText(new FileInputStream(f)).trim();
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    private static void setEnabledId(Context c, String id) {
+        File root = disabledRoot(c);
+        if (root == null) {
+            return;
+        }
+        File f = new File(root, STATE);
+        if (id == null || id.length() == 0) {
+            f.delete();
+            return;
+        }
+        try {
+            OutputStream out = new FileOutputStream(f);
+            out.write(id.getBytes("UTF-8"));
+            out.close();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static boolean hasData(File dir) {
+        if (dir == null || !dir.isDirectory()) {
+            return false;
+        }
+        File[] kids = dir.listFiles();
+        if (kids == null) {
+            return false;
+        }
+        for (int i = 0; i < kids.length; i++) {
+            if (!kids[i].getName().startsWith(".")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean moveData(File src, File dst) {
+        if (src == null || !src.isDirectory()) {
+            return false;
+        }
+        if (!dst.isDirectory() && !dst.mkdirs()) {
+            return false;
+        }
+        File[] kids = src.listFiles();
+        if (kids == null) {
+            return true;
+        }
+        for (int i = 0; i < kids.length; i++) {
+            File k = kids[i];
+            if (k.getName().startsWith(".")) {
+                continue;
+            }
+            File d = new File(dst, k.getName());
+            if (d.exists()) {
+                deleteTree(d);
+            }
+            if (k.renameTo(d)) {
+                continue;
+            }
+            try {
+                if (k.isDirectory()) {
+                    if (!d.mkdirs() && !d.isDirectory()) {
+                        return false;
+                    }
+                    copyTree(k, d);
+                } else {
+                    copyFile(k, d);
+                }
+            } catch (Throwable t) {
+                return false;
+            }
+            deleteTree(k);
+        }
+        return true;
+    }
+
     public static class Slot {
         public File dir;
-        /** true = lives in Mod/, the game loads it. */
+
         public boolean enabled;
         public String id = "";
-        /** Name from mod.txt / mod.json; empty string when unavailable. */
+
         public String name = "";
         public long bytes = 0;
         public int files = 0;
 
-        /** Spec 2: name read from <name> in mod.txt, falling back to NA. */
         public String display(Context c) {
             if (name != null && name.length() > 0) {
                 return name;
@@ -342,16 +414,27 @@ public final class ModImporter {
             return L10n.t(c, "mm_name_na", "NA");
         }
 
-        /** Spec 2: mod size on disk, in MB. */
         public String sizeText() {
             return ModImporter.mb(bytes);
         }
     }
 
-    /** Every mod on disk: enabled ones first, disabled ones after, each group sorted by directory name. */
     public static List<Slot> listSlots(Context c) {
         List<Slot> out = new ArrayList<Slot>();
-        addSlots(out, modRoot(c), true);
+        File active = modRoot(c);
+        if (hasData(active)) {
+            Slot s = new Slot();
+            s.dir = active;
+            s.enabled = true;
+            s.id = enabledId(c);
+            if (s.id.length() == 0) {
+                s.id = "Mod";
+            }
+            s.name = readName(active);
+            s.files = countFiles(active);
+            s.bytes = dirSize(active);
+            out.add(s);
+        }
         addSlots(out, disabledRoot(c), false);
         return out;
     }
@@ -371,7 +454,7 @@ public final class ModImporter {
         });
         for (int i = 0; i < kids.length; i++) {
             File f = kids[i];
-            if (!f.isDirectory() || f.getName().startsWith(".")) {
+            if (f.getName().startsWith(".") || !hasData(f)) {
                 continue;
             }
             Slot s = new Slot();
@@ -385,7 +468,6 @@ public final class ModImporter {
         }
     }
 
-    /** Spec 2: name = <name> from mod.txt -> name from mod.json -> "" (the UI shows NA). */
     public static String readName(File dir) {
         if (dir == null || !dir.isDirectory()) {
             return "";
@@ -413,7 +495,6 @@ public final class ModImporter {
         return "";
     }
 
-    /** Find the first file named name inside dir and its subdirectories (up to depth levels). */
     private static File findFile(File dir, String name, int depth) {
         File f = new File(dir, name);
         if (f.isFile()) {
@@ -455,52 +536,46 @@ public final class ModImporter {
         return n;
     }
 
-    /** Spec 2: display the mod size in MB. */
     public static String mb(long bytes) {
         return String.format(Locale.US, "%.1f MB", Double.valueOf(bytes / 1048576.0));
     }
 
-    /**
-     * Enable / disable: move the mod directory between Mod/ and Mod-disabled/.
-     * Tries rename first (atomic on the same volume) and falls back to "copy + delete source".
-     */
     public static boolean setEnabled(Context c, Slot s, boolean on) {
-        if (s == null || s.dir == null || !s.dir.isDirectory()) {
-            return false;
+        if (s == null || s.enabled == on) {
+            return s != null;
         }
-        File dstRoot = on ? modRoot(c) : disabledRoot(c);
-        if (dstRoot == null) {
+        File lib = disabledRoot(c);
+        File active = modRoot(c);
+        if (lib == null || active == null) {
             return false;
-        }
-        String id = s.id == null || s.id.length() == 0 ? s.dir.getName() : s.id;
-        File dst = new File(dstRoot, id);
-        if (s.dir.getAbsolutePath().equals(dst.getAbsolutePath())) {
-            s.enabled = on;
-            return true;
         }
         try {
-            if (dst.exists()) {
-                deleteTree(dst);
-            }
-            if (s.dir.renameTo(dst)) {
-                s.dir = dst;
-                s.enabled = on;
+            String id = s.id == null || s.id.length() == 0 ? "mod" : s.id;
+            if (on) {
+                String cur = enabledId(c);
+                if (cur.length() > 0 && !cur.equals(id)) {
+                    moveData(active, new File(lib, cur));
+                }
+                if (!moveData(s.dir, active)) {
+                    return false;
+                }
+                setEnabledId(c, id);
+                s.dir = active;
+                s.enabled = true;
                 return true;
             }
-            if (!dst.mkdirs() && !dst.isDirectory()) {
+            if (!moveData(active, new File(lib, id))) {
                 return false;
             }
-            copyTree(s.dir, dst);
-            deleteTree(s.dir);
-            s.dir = dst;
-            s.enabled = on;
+            setEnabledId(c, "");
+            s.dir = new File(lib, id);
+            s.enabled = false;
             return true;
         } catch (Throwable t) {
             return false;
         }
     }
 
-    /** Spec 2: import a mod -- land it in Mod-disabled/ first; the user presses "Enable" to move it into Mod/. */
     public static String importMod(Context c, InputStream in, String suggestedName) {
         File root = disabledRoot(c);
         if (root == null) {
@@ -513,22 +588,21 @@ public final class ModImporter {
         return r;
     }
 
-    /** Spec 2: delete one mod slot (directory together with its contents). */
     public static boolean deleteSlot(Context c, Slot s) {
         if (s == null || s.dir == null) {
             return false;
         }
         boolean ok = deleteTree(s.dir);
+        if (s.enabled) {
+            setEnabledId(c, "");
+        }
         LogStore.event(c, "delete mod " + (s.id == null ? "?" : s.id) + " -> " + ok);
         return ok;
     }
 
-    // ------------------------------------------------------- backup / rollback
-
     public static File backupRoot(File modRoot, String id) {
         return new File(new File(modRoot, BACKUP_DIR), id);
     }
-
 
     private static boolean backup(File modRoot, String id) {
         File cur = new File(modRoot, id);
@@ -566,12 +640,6 @@ public final class ModImporter {
         }
     }
 
-
-
-    // ------------------------------------------------------- install
-
-
-    /** Install an external zip (a package picked or shared into the app). */
     public static String installZip(InputStream in, File modRoot, String suggestedName) {
         if (modRoot == null) {
             return "fail";
@@ -634,8 +702,7 @@ public final class ModImporter {
             } catch (Throwable ignored) {
             }
         }
-        // Requirement 6: real Firefight mods ship mod.txt (HTML-style tags) instead of mod.json.
-        // The game treats "Mod/<id>/mod.txt" as a mod, so prefer <name> for the display name.
+
         if (e.id == null || e.id.length() == 0 || e.name == null || e.name.length() == 0) {
             File mt = new File(dir, "mod.txt");
             if (mt.isFile()) {
@@ -665,7 +732,6 @@ public final class ModImporter {
         return e;
     }
 
-    /** Read the first value of &lt;tag&gt;value&lt;/tag&gt; in mod.txt. */
     public static String tagGet(String text, String tag) {
         if (text == null || tag == null) {
             return "";
@@ -690,11 +756,6 @@ public final class ModImporter {
         writeIndex(modRoot);
     }
 
-
-    /**
-     * Extract a zip into dst. With stripRoot=true a single top-level directory is stripped.
-     * Returns the number of files written; protects against zip-slip.
-     */
     public static int extractZip(InputStream raw, File dst, boolean stripRoot) {
         int count = 0;
         try {
@@ -751,7 +812,6 @@ public final class ModImporter {
         return count;
     }
 
-    /** Read the "single top-level directory" of the zip data (e.g. "example-mod/"), or null when there is none. */
     private static String commonRoot(byte[] zip) {
         try {
             java.util.zip.ZipInputStream zin =
@@ -763,7 +823,7 @@ public final class ModImporter {
                 int slash = n.indexOf('/');
                 zin.closeEntry();
                 if (slash <= 0) {
-                    return null; // a file sits directly at the root
+                    return null;
                 }
                 String head = n.substring(0, slash);
                 if (root == null) {
@@ -779,7 +839,6 @@ public final class ModImporter {
         }
     }
 
-    /** Strip the prefix directory from the raw zip byte stream (keeps zip structure and CRCs). */
     private static byte[] stripPrefix(byte[] zip, String prefix) throws IOException {
         File tmpIn = File.createTempFile("ffm", ".zip");
         FileOutputStream fos = new FileOutputStream(tmpIn);
@@ -825,9 +884,6 @@ public final class ModImporter {
         return bos.toByteArray();
     }
 
-    // ------------------------------------------------------- index snapshot
-
-    /** Write installed.json (derived file, write-only; the authoritative state is .ffm-meta plus the directories themselves). */
     public static void writeIndex(File modRoot) {
         if (modRoot == null) {
             return;

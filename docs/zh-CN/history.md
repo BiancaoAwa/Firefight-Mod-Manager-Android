@@ -17,7 +17,8 @@
   张自动分页）、关于管理器。
 * 模组名读 `mod.txt` 的 `<name>`，取不到显示 `NA`；地图名读 `<CODE>-scenarios.txt` 的
   `<name>`，取不到显示 4 位代码。
-* 多语言：文案数据表放 Python（`l10n_data.py` / `l10n_extra.py` / `l10n_round3.py`），
+* 多语言：文案数据表放 Python（`l10n_data.py` / `l10n_extra.py` / `l10n_round3.py`，第 9 轮又加了
+  `l10n_round4.py`），
   构建时由 `gen_l10n.py` 生成 `res/values*/ffm_strings.xml`，Java 侧只写 `t("ffm_...")`。
   这样做的好处是文案集中可校验：`gen_l10n.py` 会扫 Java 源码里的键，缺定义直接让构建失败。
 * 地图侧的事实来自游戏 `libmain.so` 的字符串表：地图目录 `Custom Maps/<4 字符代码>/`，
@@ -136,6 +137,38 @@ verify_apk.ps1                                              → RESULT: PASS（G
 
 ---
 
+## 第 9 轮：Mod 裸数据化、地图顺序与启用禁用、注释精简
+
+**需求**：①`Mod/` 里不能套子目录，必须是裸数据；②地图目录按
+`CustomMapCodeNames.txt` 的行序列出并能在管理器里改顺序；③地图也要有启用/禁用；
+④模组或地图改完提示「重启生效」；⑤代码注释只留「这是干什么的 / 什么没有实现」，其余删掉。
+
+**怎么改的**：
+
+* `ModImporter`：`Mod/` 现在只放当前启用模组的数据文件（平铺、无 `<id>/`）；未启用的模组留在
+  库目录 `Mod-disabled/<id>/`，活动模组的 id 记在 `Mod-disabled/.ffm-enabled`——这个状态文件
+  刻意放在库里，就是为了让 `Mod/` 保持纯数据。启用一个模组时会先把当前启用那套数据整套搬回
+  它自己的库目录，所以**同一时间只有一个模组启用**。搬运用 `moveData()` 逐个 `renameTo`，
+  失败再退回「复制 + 删源」。
+* `MapImporter`：`listMaps()` 不再按目录名排序，而是**按代码表的行序**列出（表里多出来的代码也
+  列出来、标记为「目录缺失」）；新增 `moveCode()` 把相邻两条代码行对调后写回；启用/禁用就是
+  `registerCode()` / `unregisterCode()`——**地图目录不动**，只是代码表里有没有这一行。
+* `ModManagerActivity`：地图每行加「启用/禁用、上移、下移」三个按钮（用页内下标定位）；
+  新增 `promptRestart()`（弹框，可直接「立即重启」重新拉起 `MyGame`），挂在模组启用/禁用/删除、
+  地图启用/禁用/删除/移动/导入之后；模组页与地图页各加一句说明文案。
+* 文案：新增 `core/tools/l10n_round4.py`（7 个键 × 11 个语种），`gen_l10n.py` 合并。
+
+**注释精简**：先写 `strip_comments.py` 删除注释（Java 手写扫描器跳过字符串/字符字面量，
+Python 走 `tokenize` 只删 `COMMENT`，PowerShell 逐行做引号感知），再给每个文件补 1–3 行英文头，
+只写「做什么」和「没实现什么」。译文数据文件（`l10n_*.py`）动完要用 `git diff --unified=0`
+确认「非注释新增行 = 0」，否则会把译文一起改坏。
+
+**结果**：class 文件 34 个、`classes.dex` 69144 字节、Java 实际引用的 81 个键全部有译文、
+`values-zh-rTW 192/193`（唯一缺的是已废弃、Java 已不再引用的 `about_github`）、
+`stored-so-violations: 0`，构建与 `verify_apk.ps1` 均通过。
+
+---
+
 ## 踩过的坑（速查）
 
 | 坑 | 教训 |
@@ -149,3 +182,4 @@ verify_apk.ps1                                              → RESULT: PASS（G
 | 构建脚本用 `$ErrorActionPreference = "Stop"` | 原生命令（javac/d8）往 stderr 写警告会被当终止错误；改 `Continue` + 查 `$LASTEXITCODE` |
 | apktool 回编译几百 MB 的包 | 慢是正常的（3–8 分钟），日志写文件，别指望终端输出 |
 | 只是想改工作树里的文件，却被报「文件不存在，重新读」 | 文件系统层对「先删后写」有版本守卫；重新创建同名文件时换个思路（先写到新名字再改名） |
+| 用朴素文本替换「删注释 / 翻注释」 | 会把 Python docstring、字符串里的中文一起改掉（5 个工具文件直接语法崩）；必须用解析器（`tokenize`）或「显式行号 → 整行新文本」的映射，改完跑 `py_compile` |
