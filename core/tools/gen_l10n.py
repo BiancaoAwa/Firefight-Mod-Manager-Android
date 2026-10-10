@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""把 l10n_data.py 里的文案生成到 apktool 工程的 res/values[-xx]/ 下（需求①）。
+"""Generate the strings from l10n_data.py into the apktool project under res/values[-xx]/ (requirement 1).
 
-用法：
+Usage:
     python tools/gen_l10n.py
 
-产出：
-    work/v35/res/values/ffm_strings.xml            <- 英文（默认，覆盖全部键）
-    work/v35/res/values-<locale>/ffm_strings.xml   <- 各语种（缺的键自动回落英文）
+Output:
+    work/v35/res/values/ffm_strings.xml            <- English (default, covers every key)
+    work/v35/res/values-<locale>/ffm_strings.xml   <- other languages (missing keys fall back to English)
 
-只新增文件，不改动原 APK 已有的 res/values*/strings.xml；
-work/v35/res/values/public.xml 已存在，aapt2 会沿用原有资源 ID，新增字符串拿到新 ID。
+It only adds files; the existing res/values*/strings.xml of the original APK is left untouched;
+work/v35/res/values/public.xml already exists, so aapt2 reuses the existing resource IDs and new strings get new IDs.
 """
 
 import os
@@ -27,29 +27,29 @@ from l10n_data import EN, EN_KEYS, T  # noqa: E402
 from l10n_extra import EN_EXTRA, T_EXTRA  # noqa: E402
 from l10n_round3 import EN_R3, T_R3  # noqa: E402
 
-# 第 2 轮反馈新增的键（语言切换 / 自定义地图 / 合并后的主菜单）在这里合并进来，
-# 这样不用去改 79KB 的 l10n_data.py。
+# keys added for the round-2 feedback (language switch / custom maps / the merged main menu) are merged here,
+# so that the 79 KB l10n_data.py does not have to be edited.
 EN = list(EN) + list(EN_EXTRA)
 EN_KEYS = [k for k, _v in EN]
 for _loc, _d in T_EXTRA.items():
     T.setdefault(_loc, {}).update(_d)
 
-# 第 3 轮（真界面重做）新增的键。
+# keys added in round 3 (the real UI rework).
 EN = list(EN) + list(EN_R3)
 EN_KEYS = [k for k, _v in EN]
 for _loc, _d in T_R3.items():
     T.setdefault(_loc, {}).update(_d)
 
-# 资源名合法性：ffm_<key> 必须是小写字母/数字/下划线
+# resource name validity: ffm_<key> must be lowercase letters/digits/underscores
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def android_escape(v):
-    """按 aapt2 的 <string> 语法转义。
+    """Escape for aapt2's <string> syntax.
 
-    aapt2 会把单引号当语法字符：未转义的 ' 直接报
-    `error: unescaped apostrophe in string`（法语/意大利语/土耳其语全中招）。
-    反斜杠本身是转义前缀，所以必须先转义；行首的 @ / ? 会被当成资源引用。
+    aapt2 treats the apostrophe as a syntax character: an unescaped ' fails outright with
+    `error: unescaped apostrophe in string` (French/Italian/Turkish all hit this).
+    A backslash is itself an escape prefix, so it must be escaped first; a leading @ or ? is treated as a resource reference.
     """
     v = v.replace("\\", "\\\\")
     v = v.replace("'", "\\'")
@@ -73,7 +73,7 @@ def xml_file(path, items):
 
 
 def java_keys():
-    """扫描 Java 源码里出现的 t("key" / t("key", ...) 字面量键名。"""
+    """Scan the Java sources for literal t("key") / t("key", ...) key names."""
     found = set()
     pat = re.compile(r'\bt\(\s*"([a-zA-Z0-9_]+)"')
     for dirpath, _dirs, files in os.walk(SRC):
@@ -89,24 +89,24 @@ def main():
     errors = []
     for k in EN_KEYS:
         if not NAME_RE.match("ffm_" + k):
-            errors.append("非法资源名: ffm_" + k)
+            errors.append("invalid resource name: ffm_" + k)
     if len(set(EN_KEYS)) != len(EN_KEYS):
-        errors.append("EN 里有重复键")
+        errors.append("duplicate key in EN")
 
-    # 数据完整性：各语种只能出现 EN 里已有的键
+    # data integrity: a language may only use keys that already exist in EN
     for loc, d in T.items():
         for k in d:
             if k not in EN_KEYS:
-                errors.append("%s 用了 EN 里不存在的键: %s" % (loc, k))
+                errors.append("%s uses a key that does not exist in EN: %s" % (loc, k))
 
-    # Java 用到的键必须都有定义
+    # every key used by Java must be defined
     used = java_keys()
     for k in sorted(used):
         if k not in EN_KEYS:
-            errors.append("Java 用到但 EN 未定义的键: %s" % k)
+            errors.append("key used by Java but undefined in EN: %s" % k)
 
     if errors:
-        print("校验失败：")
+        print("validation failed:")
         for e in errors:
             print("  -", e)
         return 1
@@ -114,7 +114,7 @@ def main():
     os.makedirs(os.path.join(RES, "values"), exist_ok=True)
     xml_file(os.path.join(RES, "values", "ffm_strings.xml"), EN)
     total = len(EN_KEYS)
-    print("values/ (en)            %3d/%3d 键" % (total, total))
+    print("values/ (en)            %3d/%3d keys" % (total, total))
 
     rows = []
     for loc in sorted(T):
@@ -123,10 +123,10 @@ def main():
         os.makedirs(out_dir, exist_ok=True)
         xml_file(os.path.join(out_dir, "ffm_strings.xml"), [(k, d[k]) for k in EN_KEYS if k in d])
         rows.append((loc, len(d)))
-        print("values-%-16s %3d/%3d 键" % (loc, len(d), total))
+        print("values-%-16s %3d/%3d keys" % (loc, len(d), total))
 
-    print("\n语种数: %d (+ 默认英文)" % len(rows))
-    print("Java 实际引用的键: %d 个，全部已覆盖" % len(used))
+    print("\nlanguage count: %d (+ default English)" % len(rows))
+    print("keys actually referenced by Java: %d, all covered" % len(used))
     return 0
 
 

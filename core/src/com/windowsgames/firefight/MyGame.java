@@ -13,26 +13,26 @@ import org.libsdl.app.SDLActivity;
 import java.io.File;
 
 /**
- * 需求③（第 3 轮）：启动入口 = SDLActivity（游戏本体）。
+ * Requirement 3 (round 3): the launch entry point = SDLActivity (the game itself).
  *
- * 本类只做三件事：
- *   1. 让游戏照常启动（invoke-super SDLActivity.onCreate）；
- *   2. 在游戏界面上弹一个「是否使用模组管理器 / 是 否（15 秒退出）」提示框，
- *      选「是」打开 {@link ModManagerActivity}，选「否」或倒计时结束都直接进游戏；
- *   3. 提供 {@link #rootOfStatic(Context)} 给 ModImporter / MapImporter / LogStore 用。
+ * This class does only three things:
+ *   1. let the game start as usual (invoke-super SDLActivity.onCreate);
+ *   2. show a prompt on top of the game: "use the mod manager? / Yes No (exit after 15 s)",
+ *      where "Yes" opens {@link ModManagerActivity} and "No" or the countdown expiring goes straight into the game;
+ *   3. provide {@link #rootOfStatic(Context)} to ModImporter / MapImporter / LogStore.
  *
- * 第 3 轮规格：管理器本身是整屏界面，不再用 AlertDialog 堆菜单。
+ * Round-3 spec: the manager itself is a full-screen UI, no more menus stacked in an AlertDialog.
  */
 public class MyGame extends SDLActivity {
 
     private static MyGame _cachedContext;
 
-    /** BillingManager 等外部代码按这个签名静态调用，勿改。 */
+    /** External code such as BillingManager calls this statically by signature -- do not change. */
     public static MyGame getContext() {
         return _cachedContext;
     }
 
-    /** 提示框倒计时秒数（规格：15 秒退出）。 */
+    /** Countdown seconds of the prompt (spec: exit after 15 s). */
     private static final int PROMPT_SECONDS = 15;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -40,7 +40,7 @@ public class MyGame extends SDLActivity {
     private int left = PROMPT_SECONDS;
     private boolean shown = false;
 
-    // ------------------------------------------------------------ 生命周期
+    // ------------------------------------------------------------ lifecycle
 
     protected void onCreate(Bundle savedInstanceState) {
         try {
@@ -63,7 +63,7 @@ public class MyGame extends SDLActivity {
         }, 600);
     }
 
-    // ------------------------------------------------------------ 入口提示框
+    // ------------------------------------------------------------ launch prompt
 
     private void showPrompt() {
         if (shown || isFinishing()) {
@@ -134,9 +134,9 @@ public class MyGame extends SDLActivity {
         return L10n.t(this, key, key);
     }
 
-    // ------------------------------------------------------------ 存储根目录
+    // ------------------------------------------------------------ storage root
 
-    /** &lt;files&gt; 根目录，三级退化；ModImporter / MapImporter / LogStore 都用这个。 */
+    /** &lt;files&gt; root directory with a three-level fallback; ModImporter / MapImporter / LogStore all use it. */
     public static File rootOfStatic(Context c) {
         if (c == null) {
             return null;

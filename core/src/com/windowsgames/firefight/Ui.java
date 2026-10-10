@@ -11,23 +11,23 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * 第 3 轮：整屏界面的轻量控件工厂。
+ * Round 3: lightweight widget factory for the full-screen UI.
  *
- * 全部用代码搭布局，不新增 res/layout —— 这样构建链只需要 apktool 编译 values 资源，
- * 不依赖 aapt2 的布局编译，减少一个失败点。配色全部从主题属性取，浅色/深色主题都能看。
+ * Everything is built in code with no new res/layout, so the build chain only needs apktool to compile
+ * values resources, without aapt2 layout compilation: one failure point less. All colors come from theme attributes, so light and dark themes both stay readable.
  */
 final class Ui {
 
     private Ui() {
     }
 
-    // ------------------------------------------------------------ 尺寸 / 配色
+    // ------------------------------------------------------------ sizes / colors
 
     static int dp(Context c, float v) {
         return (int) (v * c.getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    /** 取主题颜色属性，取不到用 fallback。 */
+    /** Resolve a theme color attribute, falling back when it is unavailable. */
     static int color(Context c, int attr, int fallback) {
         try {
             TypedValue tv = new TypedValue();
@@ -74,7 +74,7 @@ final class Ui {
         return g;
     }
 
-    // ------------------------------------------------------------ 容器
+    // ------------------------------------------------------------ containers
 
     static LinearLayout column(Context c) {
         LinearLayout l = new LinearLayout(c);
@@ -89,7 +89,7 @@ final class Ui {
         return l;
     }
 
-    /** 卡片容器：圆角背景 + 内边距。 */
+    /** Card container: rounded background + padding. */
     static LinearLayout card(Context c) {
         LinearLayout l = column(c);
         l.setBackground(cardBg(c));
@@ -113,7 +113,7 @@ final class Ui {
         return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, w);
     }
 
-    // ------------------------------------------------------------ 文本
+    // ------------------------------------------------------------ text
 
     static TextView text(Context c, String s, float sp, int color, boolean bold) {
         TextView v = new TextView(c);
@@ -148,7 +148,7 @@ final class Ui {
     }
 
 
-    // ------------------------------------------------------------ 按钮
+    // ------------------------------------------------------------ buttons
 
     static Button button(Context c, String s) {
         Button b = new Button(c);
@@ -173,7 +173,7 @@ final class Ui {
         return b;
     }
 
-    /** 标题栏右侧的紧凑按钮（语言 / 返回）：不给最小宽度，避免把标题挤没。 */
+    /** Compact button on the right of the title bar (language / back): no minimum width, so the title is not squeezed out. */
     static Button headerAction(Context c, String s) {
         Button b = action(c, s);
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
@@ -184,7 +184,7 @@ final class Ui {
         return b;
     }
 
-    // ------------------------------------------------------------ 分隔线
+    // ------------------------------------------------------------ divider
 
     static View divider(Context c) {
         View v = new View(c);

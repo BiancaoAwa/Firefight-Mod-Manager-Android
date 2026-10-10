@@ -20,18 +20,18 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
- * 模组包导入器（需求⑤）。
+ * Mod package importer (requirement 5).
  *
- * 支持的模组包形态：
- *   A) APK 内置：assets/Mod/*.zip                —— zip 内含 mod.json 与 payload 文件
- *   B) APK 内置：assets/Mod/<id>/mod.json        —— 目录形态（含任意子目录/文件）
- *   C) 外部文件：文件选择器拿到的 .zip / .ffmod
+ * Supported mod package forms:
+ *   A) Bundled in the APK: assets/Mod/*.zip                -- zip holding mod.json and payload files
+ *   B) Bundled in the APK: assets/Mod/<id>/mod.json        -- directory form (any subdirectories/files)
+ *   C) External file: .zip / .ffmod handed over by the file picker
  *
- * 安装布局（<modRoot> 通常 = files/Mod）：
- *   <modRoot>/<id>/...            模组内容
- *   <modRoot>/<id>/.ffm-meta      本管理器写入的安装元信息（导入时间/来源/文件数）
- *   <modRoot>/.backup/<id>/<ts>/  覆盖安装前的自动备份（用于回滚）
- *   <modRoot>/installed.json     供人/游戏读取的索引快照（派生文件，不参与解析）
+ * Install layout (<modRoot> is usually files/Mod):
+ *   <modRoot>/<id>/...            mod content
+ *   <modRoot>/<id>/.ffm-meta      install metadata written by this manager (time / source / file count)
+ *   <modRoot>/.backup/<id>/<ts>/  automatic backup taken before an overwrite install (used for rollback)
+ *   <modRoot>/installed.json     index snapshot for humans and the game (derived file, never parsed)
  */
 public final class ModImporter {
 
@@ -39,7 +39,7 @@ public final class ModImporter {
     public static final String BACKUP_DIR = ".backup";
     public static final String INDEX = "installed.json";
 
-    /** 一个候选/已安装模组的描述。 */
+    /** Description of one candidate or installed mod. */
     public static class ModEntry {
         public String id = "";
         public String name = "";
@@ -64,7 +64,7 @@ public final class ModImporter {
     private ModImporter() {
     }
 
-    // ---------------------------------------------------------------- 工具
+    // ---------------------------------------------------------------- helpers
 
     public static String now() {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date());
@@ -95,7 +95,7 @@ public final class ModImporter {
         return out;
     }
 
-    /** 极简 JSON 取值：在 text 里找 "key" 后第一个字符串或数字。够用即可。 */
+    /** Minimal JSON lookup: find "key" in text and return the first string or number after it. Just enough. */
     public static String jsonGet(String text, String key) {
         if (text == null || key == null) {
             return "";
@@ -196,7 +196,7 @@ public final class ModImporter {
         return n;
     }
 
-    // ------------------------------------------------------- 元信息读写
+    // ------------------------------------------------------- metadata I/O
 
     public static ModEntry readMeta(File modDir) {
         ModEntry e = new ModEntry();
@@ -261,7 +261,7 @@ public final class ModImporter {
         }
     }
 
-    // ------------------------------------------------------- 列表
+    // ------------------------------------------------------- listing
 
     public static File modRoot(Context c) {
         File base = MyGame.rootOfStatic(c);
@@ -275,7 +275,7 @@ public final class ModImporter {
         return root;
     }
 
-    /** 已安装模组（按名称排序，跳过 .backup 等隐藏目录）。 */
+    /** Installed mods (sorted by name, hidden directories such as .backup skipped). */
     public static List<ModEntry> listInstalled(File modRoot) {
         List<ModEntry> out = new ArrayList<ModEntry>();
         if (modRoot == null || !modRoot.isDirectory()) {
@@ -300,15 +300,15 @@ public final class ModImporter {
     }
 
 
-    // ------------------------------------------------- 启用 / 禁用（第 3 轮）
+    // ------------------------------------------------- enable / disable (round 3)
 
     /**
-     * 已禁用模组的存放目录，与 Mod/ 同级。游戏只读 &lt;files&gt;/Mod，所以「禁用」
-     * 只能把模组目录搬出去，不能只改目录名（改了名字游戏可能照样扫得到）。
+     * Directory holding disabled mods, a sibling of Mod/. The game only reads &lt;files&gt;/Mod, so disabling
+     * can only move the mod directory away; renaming it alone may still leave it visible to the game's scan.
      */
     public static final String DISABLED_DIR = "Mod-disabled";
 
-    /** 最近一次 installZip 装出来的目录名，给界面提示用。 */
+    /** Directory name produced by the most recent installZip, used for UI feedback. */
     public static String lastInstalledId = "";
 
     public static File disabledRoot(Context c) {
@@ -323,18 +323,18 @@ public final class ModImporter {
         return root;
     }
 
-    /** 界面上的一个模组槽位。 */
+    /** One mod slot in the UI. */
     public static class Slot {
         public File dir;
-        /** true = 在 Mod/ 里，游戏会加载。 */
+        /** true = lives in Mod/, the game loads it. */
         public boolean enabled;
         public String id = "";
-        /** mod.txt / mod.json 里的名字，取不到为空串。 */
+        /** Name from mod.txt / mod.json; empty string when unavailable. */
         public String name = "";
         public long bytes = 0;
         public int files = 0;
 
-        /** 规格②：名字读 mod.txt 的 &lt;name&gt;，取不到显示 NA。 */
+        /** Spec 2: name read from <name> in mod.txt, falling back to NA. */
         public String display(Context c) {
             if (name != null && name.length() > 0) {
                 return name;
@@ -342,13 +342,13 @@ public final class ModImporter {
             return L10n.t(c, "mm_name_na", "NA");
         }
 
-        /** 规格②：模组文件大小，单位 MB。 */
+        /** Spec 2: mod size on disk, in MB. */
         public String sizeText() {
             return ModImporter.mb(bytes);
         }
     }
 
-    /** 磁盘上全部模组：启用的排前面，禁用的排后面，各自按目录名排序。 */
+    /** Every mod on disk: enabled ones first, disabled ones after, each group sorted by directory name. */
     public static List<Slot> listSlots(Context c) {
         List<Slot> out = new ArrayList<Slot>();
         addSlots(out, modRoot(c), true);
@@ -385,7 +385,7 @@ public final class ModImporter {
         }
     }
 
-    /** 规格②：名字 = mod.txt 的 &lt;name&gt; → mod.json 的 name → ""（界面显示 NA）。 */
+    /** Spec 2: name = <name> from mod.txt -> name from mod.json -> "" (the UI shows NA). */
     public static String readName(File dir) {
         if (dir == null || !dir.isDirectory()) {
             return "";
@@ -413,7 +413,7 @@ public final class ModImporter {
         return "";
     }
 
-    /** 在 dir 及其子目录（最多 depth 层）里找第一个叫 name 的文件。 */
+    /** Find the first file named name inside dir and its subdirectories (up to depth levels). */
     private static File findFile(File dir, String name, int depth) {
         File f = new File(dir, name);
         if (f.isFile()) {
@@ -455,14 +455,14 @@ public final class ModImporter {
         return n;
     }
 
-    /** 规格②：模组大小显示成 MB。 */
+    /** Spec 2: display the mod size in MB. */
     public static String mb(long bytes) {
         return String.format(Locale.US, "%.1f MB", Double.valueOf(bytes / 1048576.0));
     }
 
     /**
-     * 启用 / 禁用：把模组目录在 Mod/ 与 Mod-disabled/ 之间搬。
-     * 先 rename（同一分区是原子操作），失败再退回「复制 + 删源」。
+     * Enable / disable: move the mod directory between Mod/ and Mod-disabled/.
+     * Tries rename first (atomic on the same volume) and falls back to "copy + delete source".
      */
     public static boolean setEnabled(Context c, Slot s, boolean on) {
         if (s == null || s.dir == null || !s.dir.isDirectory()) {
@@ -500,7 +500,7 @@ public final class ModImporter {
         }
     }
 
-    /** 规格②：导入模组 —— 先落到 Mod-disabled/，由用户点「启用」再搬进 Mod/。 */
+    /** Spec 2: import a mod -- land it in Mod-disabled/ first; the user presses "Enable" to move it into Mod/. */
     public static String importMod(Context c, InputStream in, String suggestedName) {
         File root = disabledRoot(c);
         if (root == null) {
@@ -513,7 +513,7 @@ public final class ModImporter {
         return r;
     }
 
-    /** 规格②：删除一个模组槽位（目录连同内容）。 */
+    /** Spec 2: delete one mod slot (directory together with its contents). */
     public static boolean deleteSlot(Context c, Slot s) {
         if (s == null || s.dir == null) {
             return false;
@@ -523,7 +523,7 @@ public final class ModImporter {
         return ok;
     }
 
-    // ------------------------------------------------------- 备份 / 回滚
+    // ------------------------------------------------------- backup / rollback
 
     public static File backupRoot(File modRoot, String id) {
         return new File(new File(modRoot, BACKUP_DIR), id);
@@ -568,10 +568,10 @@ public final class ModImporter {
 
 
 
-    // ------------------------------------------------------- 安装
+    // ------------------------------------------------------- install
 
 
-    /** 安装外部 zip（文件选择器/分享进来的包）。 */
+    /** Install an external zip (a package picked or shared into the app). */
     public static String installZip(InputStream in, File modRoot, String suggestedName) {
         if (modRoot == null) {
             return "fail";
@@ -634,8 +634,8 @@ public final class ModImporter {
             } catch (Throwable ignored) {
             }
         }
-        // 需求⑥：真正的 Firefight 模组用 mod.txt（HTML 风格标签），没有 mod.json。
-        // 游戏认定「Mod/<id>/mod.txt」就是一个模组，所以名字优先取 <name>。
+        // Requirement 6: real Firefight mods ship mod.txt (HTML-style tags) instead of mod.json.
+        // The game treats "Mod/<id>/mod.txt" as a mod, so prefer <name> for the display name.
         if (e.id == null || e.id.length() == 0 || e.name == null || e.name.length() == 0) {
             File mt = new File(dir, "mod.txt");
             if (mt.isFile()) {
@@ -665,7 +665,7 @@ public final class ModImporter {
         return e;
     }
 
-    /** 取 mod.txt 里 &lt;tag&gt;值&lt;/tag&gt; 的第一个值。 */
+    /** Read the first value of &lt;tag&gt;value&lt;/tag&gt; in mod.txt. */
     public static String tagGet(String text, String tag) {
         if (text == null || tag == null) {
             return "";
@@ -692,8 +692,8 @@ public final class ModImporter {
 
 
     /**
-     * 解压 zip 到 dst。stripRoot=true 时若压缩包只有一个顶层目录则剥掉它。
-     * 返回写出的文件数；防 zip-slip。
+     * Extract a zip into dst. With stripRoot=true a single top-level directory is stripped.
+     * Returns the number of files written; protects against zip-slip.
      */
     public static int extractZip(InputStream raw, File dst, boolean stripRoot) {
         int count = 0;
@@ -751,7 +751,7 @@ public final class ModImporter {
         return count;
     }
 
-    /** 读出 zip 数据的「唯一顶层目录」（如 "example-mod/"），没有则返回 null。 */
+    /** Read the "single top-level directory" of the zip data (e.g. "example-mod/"), or null when there is none. */
     private static String commonRoot(byte[] zip) {
         try {
             java.util.zip.ZipInputStream zin =
@@ -763,7 +763,7 @@ public final class ModImporter {
                 int slash = n.indexOf('/');
                 zin.closeEntry();
                 if (slash <= 0) {
-                    return null; // 有文件直接在根上
+                    return null; // a file sits directly at the root
                 }
                 String head = n.substring(0, slash);
                 if (root == null) {
@@ -779,7 +779,7 @@ public final class ModImporter {
         }
     }
 
-    /** 按 zip 原始字节流剥掉前缀目录（保留 zip 结构与 CRCs）。 */
+    /** Strip the prefix directory from the raw zip byte stream (keeps zip structure and CRCs). */
     private static byte[] stripPrefix(byte[] zip, String prefix) throws IOException {
         File tmpIn = File.createTempFile("ffm", ".zip");
         FileOutputStream fos = new FileOutputStream(tmpIn);
@@ -825,9 +825,9 @@ public final class ModImporter {
         return bos.toByteArray();
     }
 
-    // ------------------------------------------------------- 索引快照
+    // ------------------------------------------------------- index snapshot
 
-    /** 生成 installed.json（派生文件，只写不读；权威状态在 .ffm-meta 与目录本身）。 */
+    /** Write installed.json (derived file, write-only; the authoritative state is .ffm-meta plus the directories themselves). */
     public static void writeIndex(File modRoot) {
         if (modRoot == null) {
             return;
