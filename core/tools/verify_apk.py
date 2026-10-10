@@ -1,26 +1,17 @@
-# -*- coding: utf-8 -*-
-"""Static zip-level verification of a signed APK (MVP gate G1/G2/G7).
+"""Zip-level checks on a signed APK: the dex entries, the STORED .so entries and the bundled
+assets.
 
-Usage: python tools/verify_apk.py <apk> [dex-classes.dex]
-
-Checks:
-  * every classes*.dex entry is present, including the newly injected one
-  * all lib/**/*.so are STORED (a hard requirement of extractNativeLibs="false")
-  * the built-in mod packages under assets/Mod are inside the package
-  * AndroidManifest.xml / resources.arsc exist
-"""
+Usage: python verify_apk.py <apk>"""
 import sys
 import zipfile
 
 FAIL = 0
-
 
 def check(ok, msg):
     global FAIL
     print(("  OK   " if ok else "  FAIL ") + msg)
     if not ok:
         FAIL = 1
-
 
 def main():
     apk = sys.argv[1]
@@ -60,7 +51,6 @@ def main():
 
     print("\nRESULT: %s" % ("PASS" if FAIL == 0 else "FAIL"))
     return FAIL
-
 
 if __name__ == "__main__":
     sys.exit(main())

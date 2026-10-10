@@ -14,8 +14,8 @@ directory:
 
 ```
 /storage/emulated/0/Android/data/com.windowsgames.firefight.mod/files/     <- <base>
-├── Mod/                   mods (the game only reads here)
-├── Mod-disabled/          disabled mods, and freshly imported ones not yet enabled
+├── Mod/                   data of the one active mod (raw files; the game reads only here)
+├── Mod-disabled/          the mod library: inactive mods, state file, backups, index
 ├── Custom Maps/           custom maps
 └── ...                    the game's own saves and so on
 ```
@@ -31,33 +31,36 @@ says; with a different package the package name inside the path changes too. The
 
 ### 1.1 The shape the game accepts
 
-The game considers **`<base>/Mod/<id>/` to be a mod directory**, recognised by the
-`mod.txt` inside it:
+The game considers **`<base>/Mod/` itself to be the mod directory**: the data files sit
+directly in `Mod/` (`Mod/mod.txt`, `Mod/Data/...`), **without another `<id>/` level**.
 
 * `mod.txt` is HTML-style tag text; the manager reads `<name>` from it as the display name;
 * some community packages use `mod.json` instead, which the manager also recognises (the
   sample mod is of that kind);
 * name lookup order: `mod.txt` `<name>` -> `mod.json` `name` -> empty (shown as `NA` in the UI).
 
-`<id>` is the directory name and is the mod's identity inside the manager. The directory
-may contain arbitrary subdirectories and files; the manager does not parse the contents, it
-only moves them.
+`Mod/` may contain arbitrary subdirectories and files; the manager does not parse the
+contents, it only moves them.
 
 ### 1.2 What the manager adds
 
-Inside `<base>/Mod/<id>/` the manager writes:
+Metadata and the index live in the library (`Mod-disabled/`), so `Mod/` stays pure data:
 
 | Path | Contents |
 | --- | --- |
-| `.ffm-meta` | Install metadata (import time, source, file count) |
-| `<base>/Mod/.backup/<id>/<timestamp>/` | Automatic backup taken before an overwriting install |
-| `<base>/Mod/installed.json` | An index snapshot for humans or the game (a derived file; the manager does not rely on it) |
+| `<base>/Mod-disabled/<id>/.ffm-meta` | Install metadata (import time, source, file count) |
+| `<base>/Mod-disabled/.ffm-enabled` | Id of the active mod (deliberately kept in the library so `Mod/` stays clean) |
+| `<base>/Mod-disabled/.backup/<id>/<timestamp>/` | Automatic backup taken before an overwriting install |
+| `<base>/Mod-disabled/installed.json` | Index snapshot for humans (a derived file; the manager does not rely on it) |
+
+`<id>` is the directory name inside the library and is the mod's identity in the manager.
 
 ### 1.3 Enable / disable
 
-The game only reads `Mod/`, so "disable" is not a flag: the whole directory is moved to a
-sibling `Mod-disabled/`, and "enable" moves it back. "Currently enabled" in the UI simply
-means "it is in `Mod/` right now".
+The game only reads `Mod/`, so "enable" moves this mod's files from `Mod-disabled/<id>/` into
+`Mod/`, and "disable" moves them back. **Only one mod can be active at a time**: enabling a mod
+first moves the currently active data back into its own library directory. "Currently enabled"
+in the UI simply means "its data is in `Mod/` right now".
 
 ### 1.4 The three import sources
 
@@ -121,7 +124,17 @@ If you do not want the samples, delete `core/assets/Mod/` before running
   code**, otherwise the game ignores the map. The manager appends the registration
   automatically when importing a map.
 
-### 2.2 Map packages
+### 2.2 Enable / disable and order
+
+The code table is the switch:
+
+* the code is listed -> the map is enabled; deleting that line -> the map is disabled (the
+  **map directory is left alone**, so it can be enabled again at any time);
+* the **line order in that file is the map order in the game**. The manager lists maps in that
+  order and offers "move up / move down", which swaps two lines and writes the file back
+  (comment and blank lines keep their position).
+
+### 2.3 Map packages
 
 Map packages downloaded from the internet are usually "an archive named after the
 4-character code". The manager unpacks it into `Custom Maps/<CODE>/` and then registers
@@ -130,3 +143,6 @@ Map packages downloaded from the internet are usually "an archive named after th
 The UI name comes from the first `<name>` under `<map>` in `<CODE>-scenarios.txt` (or
 `.dat`); if that cannot be read, the 4-character code is shown. The file size is the sum of
 all files inside that map directory.
+
+After a mod or map change the manager offers to restart the game, because the change only
+takes effect on the next start.

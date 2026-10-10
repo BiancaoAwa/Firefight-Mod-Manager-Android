@@ -1,12 +1,4 @@
-# Firefight Mod Manager -- static verification of the signed APK (G1-G9)
-#
-# Usage (from the repository root):
-#   pwsh -File core/tools/verify_apk.ps1
-#   pwsh -File core/tools/verify_apk.ps1 -Apk D:\some\other.apk
-#
-# G1 artifact info / G2 zip layer (dex, stored .so) / G3 zipalign / G4 signature
-# G5 aapt2 badging / G6 class table of the injected dex / G7 size / G8 localized resources / G9 activities in the manifest
-# Exit code: 0 when everything passes.
+# Static gate over the built APK (checks G2 to G9).
 
 [CmdletBinding()]
 param(

@@ -1,11 +1,4 @@
-# Firefight Mod Manager -- on-device smoke test (install + launch + screenshot + evidence)
-#
-# Usage (from the repository root, with a device or emulator attached to adb):
-#   pwsh -File core/tools/smoke_test.ps1           install + launch + screenshot + logs
-#   pwsh -File core/tools/smoke_test.ps1 -ShotOnly screenshot only (when already installed)
-#   pwsh -File core/tools/smoke_test.ps1 -Apk <other.apk> -Package <other.package>
-#
-# Output: screenshots land in <repository root>/shots/.
+# Install the APK on a device or emulator and capture screenshots.
 
 [CmdletBinding()]
 param(
@@ -53,7 +46,7 @@ if (-not $ShotOnly) {
 & $adb shell dumpsys window 2>$null | Select-String -Pattern "mCurrentFocus|mFocusedApp" | Select-Object -First 4 | ForEach-Object { $_.Line.Trim() }
 
 "=== G8-4 crash log (a FATAL means failure) ==="
-$crash = & $adb logcat -d -t 400 2>$null | Select-String -Pattern "FATAL|AndroidRuntime.*firefight|E SDL" 
+$crash = & $adb logcat -d -t 400 2>$null | Select-String -Pattern "FATAL|AndroidRuntime.*firefight|E SDL"
 if ($crash) { $crash | Select-Object -First 30 | ForEach-Object { $_.Line } } else { "  (no FATAL/AndroidRuntime crash)" }
 
 "=== G8-5 the app's own log (logcat lines mentioning firefight) ==="

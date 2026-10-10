@@ -1,17 +1,12 @@
-# -*- coding: utf-8 -*-
-"""Search an APK (after decompression) for a few byte strings, to confirm which file/directory names the game itself recognises.
+"""Search an APK for byte strings, to check which file names the game recognises.
 
-Usage: python tools/apk_grep.py <apk> needle1 needle2 ...
-Output: for each needle, the list of matching entries plus a hit count.
-"""
+Usage: python apk_grep.py <apk> needle1 needle2 ..."""
 import re
 import sys
 import zipfile
 
-# only scan entries that may contain strings; skip large images/audio files
 SKIP = re.compile(r"\.(png|jpg|jpeg|ogg|wav|mp3|ttf|otf|webp|dat)$", re.I)
 KEEP = re.compile(r"(\.so$|\.dex$|^assets/.*\.(txt|json|xml|cfg|ini)$)", re.I)
-
 
 def main():
     apk = sys.argv[1]
@@ -39,7 +34,6 @@ def main():
         print("### %s -> %d hits" % (text, counts[text]))
         for name, c in hits[text]:
             print("    %-60s x%d" % (name, c))
-
 
 if __name__ == "__main__":
     main()

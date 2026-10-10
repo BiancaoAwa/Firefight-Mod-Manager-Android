@@ -13,34 +13,24 @@ import org.libsdl.app.SDLActivity;
 import java.io.File;
 
 /**
- * Requirement 3 (round 3): the launch entry point = SDLActivity (the game itself).
- *
- * This class does only three things:
- *   1. let the game start as usual (invoke-super SDLActivity.onCreate);
- *   2. show a prompt on top of the game: "use the mod manager? / Yes No (exit after 15 s)",
- *      where "Yes" opens {@link ModManagerActivity} and "No" or the countdown expiring goes straight into the game;
- *   3. provide {@link #rootOfStatic(Context)} to ModImporter / MapImporter / LogStore.
- *
- * Round-3 spec: the manager itself is a full-screen UI, no more menus stacked in an AlertDialog.
+ * Game entry point: extends the SDL activity, shows the launch prompt and opens the manager.
+ * Reading the mod data is the game's own native code, not this class.
  */
+
 public class MyGame extends SDLActivity {
 
     private static MyGame _cachedContext;
 
-    /** External code such as BillingManager calls this statically by signature -- do not change. */
     public static MyGame getContext() {
         return _cachedContext;
     }
 
-    /** Countdown seconds of the prompt (spec: exit after 15 s). */
     private static final int PROMPT_SECONDS = 15;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private AlertDialog prompt;
     private int left = PROMPT_SECONDS;
     private boolean shown = false;
-
-    // ------------------------------------------------------------ lifecycle
 
     protected void onCreate(Bundle savedInstanceState) {
         try {
@@ -62,8 +52,6 @@ public class MyGame extends SDLActivity {
             }
         }, 600);
     }
-
-    // ------------------------------------------------------------ launch prompt
 
     private void showPrompt() {
         if (shown || isFinishing()) {
@@ -134,9 +122,6 @@ public class MyGame extends SDLActivity {
         return L10n.t(this, key, key);
     }
 
-    // ------------------------------------------------------------ storage root
-
-    /** &lt;files&gt; root directory with a three-level fallback; ModImporter / MapImporter / LogStore all use it. */
     public static File rootOfStatic(Context c) {
         if (c == null) {
             return null;

@@ -5,11 +5,10 @@ import android.content.Context;
 import android.os.Bundle;
 
 /**
- * Compile-time-only stub: it is never packaged into the dex (it only appears on javac's -cp).
- * At runtime the original org.libsdl.app.SDLActivity of the APK provides the real class.
- * The methods declared here must match the real SDLActivity signatures exactly,
- * and this class declares only the members that MyGame.java actually calls.
+ * Compile-time stand-in for the SDL activity of the game APK. The real class is used at runtime,
+ * so this file is never packaged.
  */
+
 public class SDLActivity extends Activity {
 
     public static Context getContext() {

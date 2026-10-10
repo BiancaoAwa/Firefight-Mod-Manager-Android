@@ -21,16 +21,16 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
- * Custom map import (requirement 7).
+ * Custom map folder and the code table the game reads.
  *
- * Game-side facts (verified against the string table of libmain.so and the official docs):
- *   - Map directory = &lt;base&gt;/Custom Maps/, one folder per map named after its 4-character code:
- *     Custom Maps/&lt;CODE&gt;/&lt;CODE&gt;-world.dat / -contours.png / -tileNN.jpg / -scenarios.dat ...
- *   - The same directory must contain a CustomMapCodeNames.txt listing the map's 4-character code,
- *     otherwise the game does not recognize the map.
- *   - Downloaded map packages are archives named after the 4-character code.
- * What the manager does: extract the zip into Custom Maps/&lt;CODE&gt;/ and register CODE in CustomMapCodeNames.txt.
+ * A map lives in <external files>/Custom Maps/<CODE>/, and the game only loads a code that is
+ * listed in CustomMapCodeNames.txt. The line order of that file is the map order in the game,
+ * and removing a line disables the map without deleting it.
+ *
+ * Not implemented: editing a map, uploading a map, checking that all files of a map belong
+ * together.
  */
+
 public final class MapImporter {
 
     public static final String DIR = "Custom Maps";
@@ -41,25 +41,22 @@ public final class MapImporter {
     private MapImporter() {
     }
 
-    // ------------------------------------------------------------ data structures
-
     public static class MapEntry {
         public String code = "";
         public File dir;
         public int files;
         public long bytes;
-        /** Folder exists on disk. */
+
         public boolean present;
-        /** Code registered in CustomMapCodeNames.txt. */
+
         public boolean listed;
-        /** First <name> under <map> in <CODE>-scenarios.txt; empty string when it is not found. */
+
         public String name = "";
 
         public String label() {
             return code;
         }
 
-        /** Spec 3: name read from <name> in ****-scenarios.txt, falling back to the 4-character code. */
         public String display(Context c) {
             if (name != null && name.length() > 0) {
                 return name;
@@ -67,23 +64,21 @@ public final class MapImporter {
             return code;
         }
 
-        /** Spec 3: map size on disk (auto KB / MB). */
         public String sizeText() {
             return human(bytes);
         }
 
         public String state(Context c) {
             if (present && listed) {
-                return "OK";
+                return L10n.t(c, "mm_state_enabled", "enabled");
             }
-            if (present && !listed) {
-                return L10n.t(c, "map_state_unlisted", "not listed");
+            if (present) {
+                return L10n.t(c, "mm_state_disabled", "disabled");
             }
             return L10n.t(c, "map_state_missing", "folder missing");
         }
     }
 
-    /** Spec 3: read the first <name> under <map> in <dir>/<CODE>-scenarios.txt. */
     public static String mapName(File dir, String code) {
         if (dir == null || code == null || code.length() == 0) {
             return "";
@@ -108,7 +103,6 @@ public final class MapImporter {
         return "";
     }
 
-    /** Scenario file of a map: <CODE>-scenarios.txt first, then .dat (both appear in the .so). */
     public static File scenariosFile(File dir, String code) {
         if (dir == null || code == null) {
             return null;
@@ -133,8 +127,6 @@ public final class MapImporter {
         return null;
     }
 
-    // ------------------------------------------------------------ directories
-
     public static File mapsRoot(Context c) {
         File base = MyGame.rootOfStatic(c);
         if (base == null) {
@@ -152,10 +144,7 @@ public final class MapImporter {
         return r == null ? null : new File(r, CODES);
     }
 
-    // ------------------------------------------------------------ listing
-
     public static List<MapEntry> listMaps(Context c) {
-        List<MapEntry> out = new ArrayList<MapEntry>();
         Map<String, MapEntry> byCode = new LinkedHashMap<String, MapEntry>();
         File root = mapsRoot(c);
         if (root != null) {
@@ -182,23 +171,22 @@ public final class MapImporter {
                 }
             }
         }
+        List<MapEntry> out = new ArrayList<MapEntry>();
         List<String> codes = readCodes(c);
         for (int i = 0; i < codes.size(); i++) {
             String code = codes.get(i);
-            String up = code.toUpperCase(Locale.US);
-            MapEntry e = byCode.get(up);
+            MapEntry e = byCode.remove(code.toUpperCase(Locale.US));
             if (e == null) {
                 e = new MapEntry();
                 e.code = code;
-                byCode.put(up, e);
             }
             e.listed = true;
+            out.add(e);
         }
         out.addAll(byCode.values());
         return out;
     }
 
-    /** Read the 4-character codes in CustomMapCodeNames.txt (first token of each line). */
     public static List<String> readCodes(Context c) {
         List<String> out = new ArrayList<String>();
         File f = codesFile(c);
@@ -222,10 +210,6 @@ public final class MapImporter {
         return out;
     }
 
-    /**
-     * Extract a map code from one line. There is no sample of the official file format,
-     * so stay permissive: take the first token, cut at '=' ':' '|', then check that it is a 4-character code.
-     */
     private static String firstCode(String line) {
         if (line == null) {
             return null;
@@ -255,8 +239,6 @@ public final class MapImporter {
         }
         return t.toUpperCase(Locale.US);
     }
-
-    // ------------------------------------------------------------ register / unregister codes
 
     public static boolean registerCode(Context c, String code) {
         if (code == null || code.length() != 4) {
@@ -321,14 +303,56 @@ public final class MapImporter {
         return m.find();
     }
 
+    public static boolean moveCode(Context c, String code, int delta) {
+        if (code == null || code.length() != 4 || delta == 0) {
+            return false;
+        }
+        code = code.toUpperCase(Locale.US);
+        File f = codesFile(c);
+        if (f == null || !f.isFile()) {
+            return false;
+        }
+        try {
+            String[] lines = readText(new FileInputStream(f)).split("\n", -1);
+            int at = -1;
+            for (int i = 0; i < lines.length; i++) {
+                String cd = firstCode(lines[i].replace("\r", ""));
+                if (cd != null && cd.equals(code)) {
+                    at = i;
+                    break;
+                }
+            }
+            if (at < 0) {
+                return false;
+            }
+            int step = delta < 0 ? -1 : 1;
+            int other = -1;
+            for (int i = at + step; i >= 0 && i < lines.length; i += step) {
+                if (firstCode(lines[i].replace("\r", "")) != null) {
+                    other = i;
+                    break;
+                }
+            }
+            if (other < 0) {
+                return false;
+            }
+            String swap = lines[at];
+            lines[at] = lines[other];
+            lines[other] = swap;
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < lines.length; i++) {
+                if (i > 0) {
+                    sb.append('\n');
+                }
+                sb.append(lines[i]);
+            }
+            writeText(f, sb.toString());
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
 
-    // ------------------------------------------------------------ import
-
-    /**
-     * Import one map zip.
-     *
-     * @return "ok:CODE" / "nocode" (no 4-character code in the name) / "fail"
-     */
     public static String importZip(Context c, InputStream in, String zipName) {
         File root = mapsRoot(c);
         if (root == null) {
@@ -377,7 +401,6 @@ public final class MapImporter {
         }
     }
 
-    /** Delete a map: remove the folder and unregister its code. */
     public static String remove(Context c, String code) {
         if (code == null || code.length() == 0) {
             return "fail";
@@ -396,7 +419,6 @@ public final class MapImporter {
         return ok ? "ok" : "fail";
     }
 
-    /** Unpack: when the zip root holds a single same-named folder, use the inner one. */
     private static File unwrap(File tmp, String code) {
         File[] kids = tmp.listFiles();
         if (kids != null && kids.length == 1 && kids[0].isDirectory()) {
@@ -408,10 +430,6 @@ public final class MapImporter {
         return tmp;
     }
 
-    /**
-     * Find the 4-character code: prefer a folder "whose name is <CODE> and which holds <CODE>-xxx files",
-     * then the prefix of the content file names, and finally the zip file name.
-     */
     public static String detectCode(File dir, String zipName) {
         String fromZip = fromName(zipName);
         String hit = scanForCode(dir, 0);
@@ -444,7 +462,6 @@ public final class MapImporter {
         return null;
     }
 
-    /** Find a location whose folder name is 4 characters long and that holds files starting with <that code>-. */
     private static String scanForCode(File dir, int depth) {
         if (depth > 3) {
             return null;
@@ -458,7 +475,7 @@ public final class MapImporter {
                 return a.getName().compareToIgnoreCase(b.getName());
             }
         });
-        // first check whether the directory itself holds <CODE>-world.dat-like content
+
         String own = codeFromContent(kids);
         if (own != null) {
             return own;
@@ -523,9 +540,6 @@ public final class MapImporter {
         return false;
     }
 
-    // ------------------------------------------------------------ zip / file helpers
-
-    /** Extract a zip into dst and return the number of entries written; skips __MACOSX and .DS_Store, rejects path traversal. */
     public static int extractZip(InputStream raw, File dst) throws Exception {
         ZipInputStream zin = new ZipInputStream(raw);
         int n = 0;

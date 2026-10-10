@@ -1,16 +1,9 @@
-"""Append classes4.dex into an existing APK WITHOUT rewriting existing entries.
+"""Append classes4.dex to a built APK without rewriting the existing entries, because every
+lib/**/*.so has to stay STORED (the manifest sets extractNativeLibs="false").
 
-Why append-only: the manifest sets android:extractNativeLibs="false", so every
-lib/**/*.so entry must stay STORED (uncompressed).  Tools that re-zip the whole
-archive (or that recompress entries) would deflate the .so files and break the
-install/launch.  zipfile's "a" mode only appends a new local header + data and
-rewrites the central directory; existing entry payloads are copied verbatim.
-
-Usage: python inject_dex.py <apk> <dex> [entry-name]
-"""
+Usage: python inject_dex.py <apk> <classes.dex>"""
 import sys
 import zipfile
-
 
 def main():
     if len(sys.argv) < 3:
@@ -43,7 +36,6 @@ def main():
                 print("  VIOLATION %s" % name)
             return 4
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

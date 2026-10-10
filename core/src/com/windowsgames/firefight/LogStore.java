@@ -19,14 +19,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Log persistence (requirement 6): Download/Firefight-Mod-Manager/<package>/log_<yyyyMMdd_HHmmss>.txt
- *
- * Three-tier write strategy:
- *   1) A plain file in the public Download directory (available with "all files access")
- *   2) MediaStore Downloads (API 29+, no special permission, same directory via RELATIVE_PATH)
- *   3) The app-private external directory <externalFilesDir>/Firefight-Mod-Manager/<package>/ (always writable)
- * Keeps the MAX_FILES most recent logs.
+ * Append-only event log of the manager, written next to the game data and mirrored into
+ * MediaStore where the platform requires it.
+ * Not implemented: log upload, size-based rotation.
  */
+
 public final class LogStore {
 
     public static final String DIR_NAME = "Firefight-Mod-Manager";
@@ -51,7 +48,6 @@ public final class LogStore {
         return PREFIX + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
     }
 
-    /** Public Download directory; null when it is not writable. */
     public static File publicDir(Context c) {
         try {
             File dl = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -67,7 +63,6 @@ public final class LogStore {
         return null;
     }
 
-    /** Private fallback directory; null when it is not writable. */
     public static File fallbackDir(Context c) {
         try {
             File ext = c.getExternalFilesDir(null);
@@ -96,7 +91,6 @@ public final class LogStore {
         ready = true;
     }
 
-    /** Append one event and flush it to disk immediately. */
     public static synchronized void event(Context c, String msg) {
         try {
             buffer.add(stamp() + "  " + msg);
@@ -181,14 +175,11 @@ public final class LogStore {
         }
     }
 
-    /** Readable path of the current log file (or content uri), shown on the About page. */
     public static synchronized String path(Context c) {
         init(c);
         return shownPath == null ? "" : shownPath;
     }
 
-
-    /** Prune old logs: in the same directory, sort file names descending and keep only the newest MAX_FILES. */
     public static void prune(Context c) {
         try {
             File d = publicDir(c);

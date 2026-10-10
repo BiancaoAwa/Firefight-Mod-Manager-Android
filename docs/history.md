@@ -20,7 +20,7 @@ it to the APK as an extra dex.
 * A mod name comes from `<name>` in `mod.txt`, else `NA`; a map name comes from `<name>` in
   `<CODE>-scenarios.txt`, else the 4-character code.
 * Localisation: the string tables live in Python (`l10n_data.py` / `l10n_extra.py` /
-  `l10n_round3.py`) and `gen_l10n.py` generates `res/values*/ffm_strings.xml` at build time;
+  `l10n_round3.py`, joined by `l10n_round4.py` in round 9) and `gen_l10n.py` generates `res/values*/ffm_strings.xml` at build time;
   on the Java side you only write `t("ffm_...")`. The benefit is centralised, checkable
   strings: `gen_l10n.py` scans the Java sources for keys and fails the build on a missing
   definition.
@@ -163,6 +163,45 @@ Three problems fixed:
 
 ---
 
+## Round 9: flat Mod/ data, map order and enable/disable, comment trimming
+
+**Requests**: (1) `Mod/` must not contain a sub-directory, it must hold raw data; (2) the map
+list must follow the line order of `CustomMapCodeNames.txt` and that order must be editable in
+the manager; (3) maps need enable/disable too; (4) after a mod or map change, prompt for a
+restart; (5) code comments should keep only "what this does" and "what is not implemented".
+
+**How it was done**:
+
+* `ModImporter`: `Mod/` now holds only the data files of the one active mod (flat, no `<id>/`);
+  inactive mods stay in the library directory `Mod-disabled/<id>/`, and the active id is
+  recorded in `Mod-disabled/.ffm-enabled` -- deliberately inside the library so `Mod/` stays
+  pure data. Enabling a mod first moves the currently active data set back into its own library
+  directory, so **only one mod is active at a time**. Moving uses `moveData()`, which renames
+  file by file and falls back to "copy + delete source".
+* `MapImporter`: `listMaps()` no longer sorts by directory name but follows the **line order of
+  the code table** (codes in the table without a folder are listed too, marked "folder
+  missing"); a new `moveCode()` swaps two adjacent code lines and writes the file back.
+  Enable/disable is `registerCode()` / `unregisterCode()` -- the **map directory is left
+  alone**, only the line is added or removed.
+* `ModManagerActivity`: each map row gained enable/disable, up and down buttons (located by
+  page-local index); a new `promptRestart()` dialog can bring `MyGame` back up directly and is
+  triggered by mod enable/disable/delete and map enable/disable/delete/move/import; both pages
+  gained one line of explanatory text.
+* Strings: new `core/tools/l10n_round4.py` (7 keys in 11 languages), merged by `gen_l10n.py`.
+
+**Comment trimming**: `strip_comments.py` removes the comments (a hand-written scanner for Java
+that skips string and character literals, `tokenize` for Python so only `COMMENT` tokens go, a
+quote-aware line pass for PowerShell), then every file got a one-to-three-line English header
+saying what it does and what is missing. After touching the translation data files
+(`l10n_*.py`), check with `git diff --unified=0` that "non-comment added lines = 0", otherwise
+the translations themselves have been damaged.
+
+**Result**: 34 class files, `classes.dex` 69144 bytes, all 81 keys referenced by Java have
+translations, `values-zh-rTW 192/193` (the one missing key is the retired `about_github`, no
+longer referenced by Java), `stored-so-violations: 0`; build and `verify_apk.ps1` both pass.
+
+---
+
 ## Traps hit (quick reference)
 
 | Trap | Lesson |
@@ -176,3 +215,4 @@ Three problems fixed:
 | Build script using `$ErrorActionPreference = "Stop"` | Warnings that native commands (javac/d8) write to stderr are treated as terminating errors; use `Continue` + check `$LASTEXITCODE` |
 | apktool rebuilding a several-hundred-MB package | Being slow is normal (3-8 minutes); log to a file, do not rely on terminal output |
 | Only wanting to edit a file in the worktree but being told "file no longer exists, re-read" | The filesystem layer has a version guard for delete-then-write; when recreating a same-named file, work around it (write under a new name, then rename) |
+| Removing or translating comments with a naive text replacement | It also rewrites Python docstrings and Chinese text inside string literals (five tool files broke outright); use a parser (`tokenize`) or an explicit "line number -> full new line" map, then run `py_compile` |

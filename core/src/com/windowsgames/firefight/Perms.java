@@ -9,13 +9,16 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 
-/** Requirement 6: storage permission (all files access / WRITE_EXTERNAL_STORAGE) checks and requests. */
+/**
+ * Checks and requests all-files access, because the game data sits outside the app sandbox.
+ * Not implemented: a storage-access-framework fallback.
+ */
+
 final class Perms {
 
     private Perms() {
     }
 
-    /** Whether locations outside <files> can be read and written. */
     static boolean has(Context c) {
         if (c == null) {
             return false;
@@ -31,7 +34,6 @@ final class Perms {
         }
     }
 
-    /** Open the system settings page (API 30+) or request the runtime permission (older versions). */
     static void request(Activity a) {
         if (a == null) {
             return;
