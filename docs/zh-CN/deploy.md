@@ -51,9 +51,11 @@ apktool 需要的框架文件不用自己准备：脚本会从 apktool jar 里�
 （这份框架文件与官方 apktool 发布包里的一致，SHA-256
 `5DD984016ED5A5EB0EEF866E2C6E8CD352E1427828EC23ADB18005CF5648F3D7`，4,488,013 字节。）
 
-签名证书也不用准备：没给 `-Keystore` 时脚本用 `keytool` 生成一个
-`androiddebugkey`（口令 `android`）放在 `core/keystore/debug.keystore`。
-这只是调试签名；要发布请换成你自己的证书。
+签名证书也不用准备：没给 `-Keystore` 时脚本用仓库里自带的 AOSP 公开测试密钥签名
+（`core/keystore/testkey.jks`，别名与口令都是 `testkey`，与官方交战模组打包器用的是同一把）；
+该文件不存在时，才退回用 `keytool` 生成 `androiddebugkey`（口令 `android`）放在
+`core/keystore/debug.keystore`。两者都只是测试签名；要发布请换成你自己的证书
+（`-Keystore` / `-KsPass` / `-KeyAlias` / `-KeyPass`）。
 
 ### 2.3 磁盘与系统
 

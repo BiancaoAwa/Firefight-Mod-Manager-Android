@@ -27,7 +27,8 @@ pwsh -File core/tools/prepare_work.ps1 -GameApk <your Firefight APK> [-Force] [-
 
 # build
 pwsh -File core/tools/build.ps1 [-JdkHome <dir>] [-AndroidSdk <dir>] [-ApktoolJar <jar>]
-                                [-Python <exe>] [-Keystore <file>] [-OutName <name>] [-NoSign]
+                                [-Python <exe>] [-Keystore <file>] [-KsPass <pw>]
+                                [-KeyAlias <name>] [-KeyPass <pw>] [-OutName <name>] [-NoSign]
 
 # verify
 pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk <dir>] [-Python <exe>]
@@ -43,7 +44,8 @@ pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk
 | build-tools | The highest-versioned `build-tools\*` under the SDK that contains `d8.bat` |
 | apktool | `-ApktoolJar` -> `APKTOOL_JAR` -> `core\tools\apktool.jar` -> `core\tools\apktool*.jar` -> `Downloads\apktool*.jar` |
 | Python | `-Python` -> `python` / `python3` / `py` on PATH |
-| Signing keystore | `-Keystore` -> `core\keystore\debug.keystore` (created on the spot with `keytool` if missing) |
+| Signing keystore | `-Keystore` -> `core\keystore\testkey.jks` (the public AOSP testkey, alias/password `testkey`) -> `core\keystore\debug.keystore` (created on the spot with `keytool` if missing) |
+| Key password / alias | `-KsPass` / `-KeyAlias` / `-KeyPass`; without them the defaults follow the chosen keystore (`testkey` or `android` + `androiddebugkey`) |
 | apktool framework | `Ensure-Framework` extracts `prebuilt/android-framework.jar` from the apktool jar into `core/framework/1.apk` before every build |
 
 If any of them is missing the script says exactly "install this / pass that argument" and

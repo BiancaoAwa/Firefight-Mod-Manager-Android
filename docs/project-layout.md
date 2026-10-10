@@ -29,7 +29,8 @@ under `docs/`. The only documentation entry point is `README.md`, which links in
 | `core/build/` | javac/d8/apktool intermediates | ❌ |
 | `core/framework/` | apktool framework file `1.apk` (can be extracted from the apktool jar) | ❌ |
 | `core/backup/` | Backups of replaced files such as the original `MyGame.smali` | ❌ (kept for reference, but it is local state) |
-| `core/keystore/` | Auto-generated debug certificate | ❌ never commit |
+| `core/keystore/testkey.jks` | The public AOSP testkey (alias/password `testkey`) used for test builds | ✅ |
+| `core/keystore/debug.keystore` | Auto-generated debug certificate | ❌ never commit |
 | `core/logs/` | Build/decode logs | ❌ |
 | `out/` | Built APK artifacts | ❌ |
 

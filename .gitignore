@@ -3,11 +3,14 @@ core/work/
 core/build/
 core/framework/
 core/backup/
-core/keystore/
 core/logs/
 out/
 work-fresh/
 shots/
+
+# keystores: the generated debug one stays local, the public AOSP testkey is tracked
+core/keystore/*
+!core/keystore/testkey.jks
 
 # local artifacts / temporary files
 *.local

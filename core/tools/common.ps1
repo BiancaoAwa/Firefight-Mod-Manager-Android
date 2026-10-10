@@ -128,3 +128,7 @@ Write-Host "  generated a debug signing certificate: $path"
     }
     return ""
 }
+
+$TestKeyFile  = Join-Path $CoreDir "keystore\testkey.jks"
+$TestKeyPass  = "testkey"
+$TestKeyAlias = "testkey"
