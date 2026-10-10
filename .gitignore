@@ -1,0 +1,17 @@
+# 生成物（见 docs/project-layout.md）
+core/work/
+core/build/
+core/framework/
+core/backup/
+core/keystore/
+core/logs/
+out/
+work-fresh/
+shots/
+
+# 本地产物 / 临时文件
+*.local
+*.tmp
+_scratch/
+__pycache__/
+*.pyc

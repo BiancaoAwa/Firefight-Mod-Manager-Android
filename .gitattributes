@@ -1,0 +1,11 @@
+# 统一换行：文本文件一律 LF，二进制不要碰
+* text=auto eol=lf
+
+*.zip  binary
+*.jar  binary
+*.apk  binary
+*.keystore binary
+*.orig binary
+*.png  binary
+*.jpg  binary
+*.so   binary
