@@ -7,6 +7,9 @@ param(
     [string]$ApktoolJar = "",
     [string]$Python = "",
     [string]$Keystore = "",
+    [string]$KsPass = "",
+    [string]$KeyAlias = "",
+    [string]$KeyPass = "",
     [string]$OutName = "Firefight-Mod-Manager-13.2.0-mgr0.1.0.apk",
     [switch]$NoSign
 )
@@ -112,13 +115,21 @@ if ($NoSign) {
     Copy-Item $aligned $out -Force
 Write-Output "  -NoSign: writing the unsigned package $out"
 } else {
-    if (-not $Keystore) { $Keystore = Join-Path $CoreDir "keystore\debug.keystore" }
+    if (-not $Keystore) {
+        if (Test-Path $TestKeyFile) { $Keystore = $TestKeyFile }
+        else { $Keystore = Join-Path $CoreDir "keystore\debug.keystore" }
+    }
+    $isTestKey = $Keystore -eq $TestKeyFile
+    if (-not $KsPass) { if ($isTestKey) { $KsPass = $TestKeyPass } else { $KsPass = "android" } }
+    if (-not $KeyAlias) { if ($isTestKey) { $KeyAlias = $TestKeyAlias } else { $KeyAlias = "androiddebugkey" } }
+    if (-not $KeyPass) { $KeyPass = $KsPass }
 
     $ks = @(Ensure-Keystore $jdk $Keystore)[-1]
 if (-not $ks) { Fail "keystore" "Signing certificate unavailable; pass -Keystore <file.keystore>, or use -NoSign for an unsigned package." }
+    Write-Output "  signing key: $ks (alias $KeyAlias)"
     Remove-Item $out -Force -ErrorAction SilentlyContinue
-    & "$bt\apksigner.bat" sign --ks $ks --ks-pass pass:android --key-pass pass:android `
-        --ks-key-alias androiddebugkey --v1-signing-enabled true --v2-signing-enabled true `
+    & "$bt\apksigner.bat" sign --ks $ks --ks-pass pass:$KsPass --key-pass pass:$KeyPass `
+        --ks-key-alias $KeyAlias --v1-signing-enabled true --v2-signing-enabled true `
         --out $out $aligned
     if ($LASTEXITCODE -ne 0) { Fail "apksigner" $LASTEXITCODE }
     & "$bt\apksigner.bat" verify --print-certs $out | Select-String "SHA-256 digest"

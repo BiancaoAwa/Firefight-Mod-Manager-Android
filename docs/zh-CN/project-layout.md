@@ -28,7 +28,8 @@ Firefight-Mod-Manager-Android/
 | `core/build/` | javac/d8/apktool 中间产物 | ❌ |
 | `core/framework/` | apktool 框架文件 `1.apk`（可从 apktool jar 现取） | ❌ |
 | `core/backup/` | 被替换掉的旧 `MyGame.smali` 等备份 | ❌（可留作参考，但属于本地状态） |
-| `core/keystore/` | 自动生成的调试证书 | ❌ 绝不进仓库 |
+| `core/keystore/testkey.jks` | AOSP 公开测试密钥（别名与口令都是 `testkey`），测试包用它签名 | ✅ |
+| `core/keystore/debug.keystore` | 自动生成的调试证书 | ❌ 绝不进仓库 |
 | `core/logs/` | 构建/反编译日志 | ❌ |
 | `out/` | 构建产物 APK | ❌ |
 
