@@ -46,6 +46,7 @@ docs/                 # 文档
 | 文档 | 内容 |
 | --- | --- |
 | [docs/deploy.md](docs/zh-CN/deploy.md) | **部署指南**：需要的工具、两条命令做了什么、往包里加了什么、常见问题、回滚 |
+| [docs/deploy-mt-mcp.md](docs/zh-CN/deploy-mt-mcp.md) | **手机端部署**：用 MT 管理器的 MCP 注入编译好的 dex、改清单、签名，不依赖 PC 工具链 |
 | [docs/build.md](docs/zh-CN/build.md) | 构建脚本参数、工具链解析顺序、脚本自身怎么验证 |
 | [docs/architecture.md](docs/zh-CN/architecture.md) | 管理器代码结构：每个类负责什么、界面怎么搭、数据存在哪 |
 | [docs/mod-format.md](docs/zh-CN/mod-format.md) | 模组包与自定义地图的文件格式（做模组/地图时看） |

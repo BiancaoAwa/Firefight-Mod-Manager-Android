@@ -6,6 +6,9 @@ This document is for anyone who has this source tree and wants to put it into th
 Firefight APK. The whole flow is two PowerShell commands: first decode the game APK
 into a worktree and patch it, then build a new APK.
 
+If you would rather do the injection on the phone, without a PC toolchain, see
+[Injecting the mod manager with MT Manager (MCP)](deploy-mt-mcp.md).
+
 ---
 
 ## 1. What the manager is
