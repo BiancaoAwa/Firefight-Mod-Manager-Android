@@ -51,6 +51,7 @@ The worktree, build artifacts, logs and framework file are never committed, see
 | Document | Contents |
 | --- | --- |
 | [docs/deploy.md](docs/deploy.md) | **Deployment guide**: required tools, what the two commands do, what is added to the package, troubleshooting, rollback |
+| [docs/deploy-mt-mcp.md](docs/deploy-mt-mcp.md) | **On-device deployment**: inject the compiled dex with MT Manager's MCP, patch the manifest and sign, without a PC toolchain |
 | [docs/build.md](docs/build.md) | Build script arguments, toolchain resolution order, how the scripts verify themselves |
 | [docs/architecture.md](docs/architecture.md) | Manager code structure: what each class does, how the UI is built, where data lives |
 | [docs/mod-format.md](docs/mod-format.md) | File formats of mod packages and custom maps (read this when building mods/maps) |
