@@ -12,9 +12,14 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.StrictMode;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
+import android.view.WindowInsets;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -29,14 +34,15 @@ import java.util.Locale;
 
 /**
  * The manager screen: a title bar with the language switch and the return button, plus the three
- * tabs mods / maps / about.
- * Not implemented: editing a mod in place, search.
+ * tabs mods / maps / about. Both lists show every entry in one scroll view, can be filtered by
+ * name, id or number, and every entry can be moved or given another number.
+ * Not implemented: editing a mod in place, thumbnails for mods, multi-select.
  */
 
 public class ModManagerActivity extends Activity implements View.OnClickListener {
 
-    public static final String VERSION = "0.1.0";
-    public static final String BUILD = "ffm-0.1.0";
+    public static final String VERSION = "0.1.1";
+    public static final String BUILD = "ffm-0.1.1";
 
     private static final String URL_SITE = "http://www.windowsgames.co.uk/ff.html";
     private static final String URL_AUTHOR = "https://github.com/BiancaoAwa";
@@ -63,8 +69,8 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     private static final int ID_OPEN_MODS = 12;
     private static final int ID_IMPORT_MAP = 13;
     private static final int ID_OPEN_MAPS = 14;
-    private static final int ID_PREV = 15;
-    private static final int ID_NEXT = 16;
+    private static final int ID_MOD_JUMP = 15;
+    private static final int ID_MAP_JUMP = 16;
     private static final int ID_META = 21;
     private static final int ID_SITE = 22;
     private static final int ID_REPO = 23;
@@ -76,20 +82,20 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     private static final int ID_COPY = 29;
     private static final int ID_PERM = 30;
     private static final int ID_BILI = 31;
-    private static final int ID_SLOT_ON = 100;
-    private static final int ID_SLOT_DEL = 200;
-    private static final int ID_MAP_ROW = 300;
-    private static final int ID_MAP_ON = 400;
-    private static final int ID_MAP_UP = 500;
-    private static final int ID_MAP_DOWN = 600;
 
     private final Button[] tabs = new Button[3];
     private LinearLayout content;
     private TextView stat;
     private LinearLayout rootBox;
 
+    private ScrollView scroller;
+    private LinearLayout listBox;
+    private EditText searchBox;
+    private final List<View> rowViews = new ArrayList<View>();
+
     private int tab = TAB_MODS;
-    private int page = 0;
+    private String modQuery = "";
+    private String mapQuery = "";
     private boolean metaOpen = false;
     private boolean resumed = false;
 
@@ -158,6 +164,17 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
         sv.setBackgroundColor(Ui.bg(this));
+        scroller = sv;
+
+        // Keep the header clear of the status bar, the display cutout and the navigation bar.
+        final ScrollView insetView = sv;
+        sv.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            public WindowInsets onApplyWindowInsets(View v, WindowInsets ins) {
+                insetView.setPadding(ins.getSystemWindowInsetLeft(), ins.getSystemWindowInsetTop(),
+                        ins.getSystemWindowInsetRight(), ins.getSystemWindowInsetBottom());
+                return ins;
+            }
+        });
 
         LinearLayout root = Ui.column(this);
         Ui.pad(root, this, 12, 10, 12, 16);
@@ -176,6 +193,11 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         back.setOnClickListener(this);
         head.addView(back);
         root.addView(head, Ui.fill());
+
+        TextView ver = Ui.small(this, t("mm_meta_version") + " " + VERSION + "  (" + BUILD + ")");
+        LinearLayout.LayoutParams verLp = Ui.fill();
+        verLp.setMargins(0, Ui.dp(this, 2), 0, 0);
+        root.addView(ver, verLp);
 
         stat = Ui.subtitle(this, "");
         LinearLayout.LayoutParams statLp = Ui.fill();
@@ -248,56 +270,178 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     private void showMods() {
         content.removeAllViews();
         slots = ModImporter.listSlots(this);
-        long total = 0;
-        for (int i = 0; i < slots.size(); i++) {
-            total += slots.get(i).bytes;
-        }
-        setStat(t("mm_mods_count") + " " + slots.size()
-                + "    " + t("mm_mods_total") + " " + ModImporter.mb(total));
+        setStat(modStat(slots, modQuery));
 
-        if (slots.isEmpty()) {
-            content.addView(Ui.small(this, t("mm_no_mods")), Ui.fill());
-            content.addView(Ui.spacer(this, 8));
-        }
-        int show = Math.min(slots.size(), MAX_SLOTS);
-        for (int i = 0; i < show; i++) {
-            content.addView(slotCard(i, slots.get(i)), cardLp());
-        }
-        if (slots.size() > MAX_SLOTS) {
-            content.addView(Ui.small(this, t("mm_mods_slots_note")), Ui.fill());
-        }
+        LinearLayout bar = Ui.row(this);
+        searchBox = Ui.searchBox(this, t("mm_search_hint"));
+        searchBox.setText(modQuery);
+        bar.addView(searchBox, Ui.weight(1f));
+        Button jump = Ui.headerAction(this, t("mm_jump"));
+        jump.setId(ID_MOD_JUMP);
+        jump.setOnClickListener(this);
+        bar.addView(jump);
+        content.addView(bar, Ui.fill());
         content.addView(Ui.small(this, t("mm_mods_one_note")), Ui.fill());
+
+        listBox = Ui.column(this);
+        content.addView(listBox, Ui.fill());
+        searchBox.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            public void onTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            public void afterTextChanged(Editable s) {
+                modQuery = s == null ? "" : s.toString();
+                fillMods();
+                setStat(modStat(slots, modQuery));
+            }
+        });
+        fillMods();
+
         content.addView(Ui.spacer(this, 6));
         content.addView(button(ID_IMPORT_MOD, t("mm_btn_import_mod")), Ui.fill());
         content.addView(Ui.spacer(this, 4));
         content.addView(button(ID_OPEN_MODS, t("mm_btn_open_mods")), Ui.fill());
     }
 
-    private View slotCard(final int i, final ModImporter.Slot s) {
+    private String modStat(List<ModImporter.Slot> all, String query) {
+        long total = 0;
+        for (int i = 0; i < all.size(); i++) {
+            total += all.get(i).bytes;
+        }
+        String s = t("mm_mods_count") + " " + all.size()
+                + "    " + t("mm_mods_total") + " " + ModImporter.mb(total);
+        if (query != null && query.trim().length() > 0) {
+            s = s + "    (" + filterSlots(all, query).size() + "/" + all.size() + ")";
+        }
+        return s;
+    }
+
+    private List<ModImporter.Slot> filterSlots(List<ModImporter.Slot> all, String query) {
+        List<ModImporter.Slot> out = new ArrayList<ModImporter.Slot>();
+        String key = query == null ? "" : query.trim().toLowerCase(Locale.US);
+        for (int i = 0; i < all.size(); i++) {
+            ModImporter.Slot s = all.get(i);
+            if (key.length() == 0) {
+                out.add(s);
+                continue;
+            }
+            String hay = (s.display(this) + " " + s.name + " " + s.id + " " + (i + 1))
+                    .toLowerCase(Locale.US);
+            if (hay.contains(key)) {
+                out.add(s);
+            }
+        }
+        return out;
+    }
+
+    private void fillMods() {
+        if (listBox == null) {
+            return;
+        }
+        listBox.removeAllViews();
+        rowViews.clear();
+        if (slots.isEmpty()) {
+            listBox.addView(Ui.small(this, t("mm_no_mods")), Ui.fill());
+            return;
+        }
+        List<ModImporter.Slot> shown = filterSlots(slots, modQuery);
+        if (shown.isEmpty()) {
+            listBox.addView(Ui.small(this, t("mm_no_result")), Ui.fill());
+            return;
+        }
+        for (int i = 0; i < shown.size(); i++) {
+            ModImporter.Slot s = shown.get(i);
+            View v = slotCard(ModImporter.indexOfId(slots, s.id) + 1, s);
+            listBox.addView(v, cardLp());
+            rowViews.add(v);
+        }
+    }
+
+    /** Layout params for a button row inside a card, with a gap above it. */
+    private LinearLayout.LayoutParams rowLp() {
+        LinearLayout.LayoutParams lp = Ui.fill();
+        lp.setMargins(0, Ui.dp(this, 6), 0, 0);
+        return lp;
+    }
+
+    private View slotCard(final int number, final ModImporter.Slot s) {
         LinearLayout box = Ui.card(this);
-        String head = t("mm_slot") + " " + i + (i == 0 && s.enabled ? "  " + t("mm_slot_active") : "");
-        box.addView(Ui.strong(this, head), Ui.fill());
-        box.addView(Ui.body(this, s.display(this)), Ui.fill());
+        box.addView(Ui.strong(this, "#" + number + "  " + s.display(this)), Ui.fill());
         box.addView(Ui.small(this, (s.enabled ? t("mm_state_enabled") : t("mm_state_disabled"))
                 + "  ·  " + s.sizeText() + "  ·  " + s.id), Ui.fill());
-        LinearLayout btns = Ui.row(this);
+
+        LinearLayout main = Ui.row(this);
         Button toggle = Ui.button(this, s.enabled ? t("mm_btn_disable") : t("mm_btn_enable"));
-        toggle.setId(ID_SLOT_ON + i);
-        toggle.setOnClickListener(this);
+        toggle.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                toggleSlot(s);
+            }
+        });
         Button del = Ui.button(this, t("mm_btn_delete"));
-        del.setId(ID_SLOT_DEL + i);
-        del.setOnClickListener(this);
-        btns.addView(toggle, Ui.weight(1f));
-        btns.addView(del, Ui.weight(1f));
-        box.addView(btns, Ui.fill());
+        del.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                askDeleteMod(s);
+            }
+        });
+        main.addView(toggle, Ui.weight(1f));
+        main.addView(del, Ui.weight(1f));
+        box.addView(main, rowLp());
+
+        LinearLayout nums = Ui.row(this);
+        Button no = Ui.mini(this, t("mm_sort_no") + " " + number);
+        no.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                askModNumber(s, number);
+            }
+        });
+        Button up = Ui.mini(this, "\u2191");
+        up.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                moveSlot(s, -1);
+            }
+        });
+        Button down = Ui.mini(this, "\u2193");
+        down.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                moveSlot(s, 1);
+            }
+        });
+        nums.addView(no, Ui.weight(1f));
+        nums.addView(up, Ui.weight(0.5f));
+        nums.addView(down, Ui.weight(0.5f));
+        box.addView(nums, rowLp());
         return box;
     }
 
-    private void toggleSlot(int i) {
-        if (i < 0 || i >= slots.size() || i >= MAX_SLOTS) {
+    private void moveSlot(final ModImporter.Slot s, final int delta) {
+        if (s == null || !ModImporter.moveSlot(this, s, delta)) {
+            toast(t("mm_op_failed"));
             return;
         }
-        final ModImporter.Slot s = slots.get(i);
+        LogStore.event(this, "mod " + s.id + " move " + delta);
+        showTab(TAB_MODS);
+    }
+
+    private void askModNumber(final ModImporter.Slot s, int current) {
+        askNumber(t("mm_sort_no"), current, new NumberSink() {
+            public void apply(int n) {
+                if (!ModImporter.setSlotIndex(ModManagerActivity.this, s, n)) {
+                    toast(t("mm_op_failed"));
+                    return;
+                }
+                LogStore.event(ModManagerActivity.this, "mod " + s.id + " -> " + n);
+                showTab(TAB_MODS);
+            }
+        });
+    }
+
+    private void toggleSlot(final ModImporter.Slot s) {
+        if (s == null) {
+            return;
+        }
         final boolean on = !s.enabled;
         new Thread(new Runnable() {
             public void run() {
@@ -315,11 +459,10 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }).start();
     }
 
-    private void askDeleteMod(int i) {
-        if (i < 0 || i >= slots.size() || i >= MAX_SLOTS) {
+    private void askDeleteMod(final ModImporter.Slot s) {
+        if (s == null) {
             return;
         }
-        final ModImporter.Slot s = slots.get(i);
         confirm(t("mm_del_mod") + "\n\n" + s.display(this), new Runnable() {
             public void run() {
                 final boolean ok = ModImporter.deleteSlot(getApplicationContext(), s);
@@ -341,82 +484,202 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                 maps.add(all.get(i));
             }
         }
-        long total = 0;
-        for (int i = 0; i < maps.size(); i++) {
-            total += maps.get(i).bytes;
-        }
-        setStat(t("mm_maps_count") + " " + maps.size()
-                + "    " + t("mm_maps_total") + " " + MapImporter.human(total));
+        setStat(mapStat(maps, mapQuery));
 
-        int pages = Math.max(1, (maps.size() + PAGE_SIZE - 1) / PAGE_SIZE);
-        if (page >= pages) {
-            page = pages - 1;
-        }
-        if (page < 0) {
-            page = 0;
-        }
-
-        LinearLayout pager = Ui.row(this);
-        Button prev = Ui.tabButton(this, t("mm_prev"));
-        prev.setId(ID_PREV);
-        prev.setOnClickListener(this);
-        Button next = Ui.tabButton(this, t("mm_next"));
-        next.setId(ID_NEXT);
-        next.setOnClickListener(this);
-        TextView num = Ui.small(this, t("mm_page") + " " + (page + 1) + " / " + pages);
-        num.setGravity(Gravity.CENTER);
-        pager.addView(prev, Ui.weight(1f));
-        pager.addView(num, Ui.weight(1f));
-        pager.addView(next, Ui.weight(1f));
-        content.addView(pager, Ui.fill());
+        LinearLayout bar = Ui.row(this);
+        searchBox = Ui.searchBox(this, t("mm_search_hint"));
+        searchBox.setText(mapQuery);
+        bar.addView(searchBox, Ui.weight(1f));
+        Button jump = Ui.headerAction(this, t("mm_jump"));
+        jump.setId(ID_MAP_JUMP);
+        jump.setOnClickListener(this);
+        bar.addView(jump);
+        content.addView(bar, Ui.fill());
         content.addView(Ui.small(this, t("mm_map_order_hint")), Ui.fill());
 
-        if (maps.isEmpty()) {
-            content.addView(Ui.small(this, t("mm_no_maps")), Ui.fill());
-            content.addView(Ui.spacer(this, 8));
-        }
-        int from = page * PAGE_SIZE;
-        int to = Math.min(maps.size(), from + PAGE_SIZE);
-        for (int i = from; i < to; i++) {
-            content.addView(mapRow(i - from, maps.get(i)), cardLp());
-        }
+        listBox = Ui.column(this);
+        content.addView(listBox, Ui.fill());
+        searchBox.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            public void onTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            public void afterTextChanged(Editable s) {
+                mapQuery = s == null ? "" : s.toString();
+                fillMaps();
+                setStat(mapStat(maps, mapQuery));
+            }
+        });
+        fillMaps();
+
         content.addView(Ui.spacer(this, 6));
         content.addView(button(ID_IMPORT_MAP, t("mm_btn_import_map")), Ui.fill());
         content.addView(Ui.spacer(this, 4));
         content.addView(button(ID_OPEN_MAPS, t("mm_btn_open_maps")), Ui.fill());
     }
 
-    private View mapRow(final int index, final MapImporter.MapEntry e) {
+    private String mapStat(List<MapImporter.MapEntry> all, String query) {
+        long total = 0;
+        for (int i = 0; i < all.size(); i++) {
+            total += all.get(i).bytes;
+        }
+        String s = t("mm_maps_count") + " " + all.size()
+                + "    " + t("mm_maps_total") + " " + MapImporter.human(total)
+                + "    " + t("mm_load_no") + " " + MapImporter.loadCount(this)
+                + "/" + MapImporter.MAX_LOAD;
+        if (query != null && query.trim().length() > 0) {
+            s = s + "    (" + filterMaps(all, query).size() + "/" + all.size() + ")";
+        }
+        return s;
+    }
+
+    private List<MapImporter.MapEntry> filterMaps(List<MapImporter.MapEntry> all, String query) {
+        List<MapImporter.MapEntry> out = new ArrayList<MapImporter.MapEntry>();
+        String key = query == null ? "" : query.trim().toLowerCase(Locale.US);
+        for (int i = 0; i < all.size(); i++) {
+            MapImporter.MapEntry e = all.get(i);
+            if (key.length() == 0) {
+                out.add(e);
+                continue;
+            }
+            String hay = (e.display(this) + " " + e.name + " " + e.code + " " + (i + 1))
+                    .toLowerCase(Locale.US);
+            if (hay.contains(key)) {
+                out.add(e);
+            }
+        }
+        return out;
+    }
+
+    private void fillMaps() {
+        if (listBox == null) {
+            return;
+        }
+        listBox.removeAllViews();
+        rowViews.clear();
+        if (maps.isEmpty()) {
+            listBox.addView(Ui.small(this, t("mm_no_maps")), Ui.fill());
+            return;
+        }
+        List<MapImporter.MapEntry> shown = filterMaps(maps, mapQuery);
+        if (shown.isEmpty()) {
+            listBox.addView(Ui.small(this, t("mm_no_result")), Ui.fill());
+            return;
+        }
+        for (int i = 0; i < shown.size(); i++) {
+            MapImporter.MapEntry e = shown.get(i);
+            int at = maps.indexOf(e);
+            View v = mapCard((at < 0 ? i : at) + 1, e);
+            listBox.addView(v, cardLp());
+            rowViews.add(v);
+        }
+    }
+
+    private View mapCard(final int number, final MapImporter.MapEntry e) {
+        final int load = e.listed ? MapImporter.loadIndexOf(this, e.code) : -1;
+
         LinearLayout box = Ui.card(this);
-        box.addView(Ui.strong(this, e.display(this)), Ui.fill());
-        box.addView(Ui.small(this, e.code + "  ·  " + e.sizeText()
+        LinearLayout top = Ui.row(this);
+        top.addView(Ui.thumb(this, MapImporter.mapImage(e.dir, e.code), 64));
+        LinearLayout info = Ui.column(this);
+        info.addView(Ui.strong(this, "#" + number + "  " + e.display(this)), Ui.fill());
+        info.addView(Ui.small(this, e.code + "  ·  " + e.sizeText()
                 + "  ·  " + e.state(this)), Ui.fill());
-        LinearLayout btns = Ui.row(this);
+        info.addView(Ui.small(this, t("mm_sort_no") + " " + number
+                + "    " + t("mm_load_no") + " "
+                + (load > 0 ? String.valueOf(load) : t("mm_load_none"))), Ui.fill());
+        top.addView(info, Ui.weight(1f));
+        box.addView(top, Ui.fill());
+
+        LinearLayout main = Ui.row(this);
         Button on = Ui.button(this, e.listed ? t("mm_btn_disable") : t("mm_btn_enable"));
-        on.setId(ID_MAP_ON + index);
-        on.setOnClickListener(this);
-        Button up = Ui.button(this, t("mm_map_up"));
-        up.setId(ID_MAP_UP + index);
-        up.setOnClickListener(this);
-        Button down = Ui.button(this, t("mm_map_down"));
-        down.setId(ID_MAP_DOWN + index);
-        down.setOnClickListener(this);
-        btns.addView(on, Ui.weight(1f));
-        btns.addView(up, Ui.weight(1f));
-        btns.addView(down, Ui.weight(1f));
-        box.addView(btns, Ui.fill());
-        box.setId(ID_MAP_ROW + index);
+        on.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                toggleMap(e);
+            }
+        });
+        Button del = Ui.button(this, t("mm_btn_delete"));
+        del.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                askDeleteMap(e);
+            }
+        });
+        main.addView(on, Ui.weight(1f));
+        main.addView(del, Ui.weight(1f));
+        box.addView(main, rowLp());
+
+        LinearLayout sortRow = Ui.row(this);
+        Button sort = Ui.mini(this, t("mm_sort_no") + " " + number);
+        sort.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                askMapNumber(e, number);
+            }
+        });
+        Button sup = Ui.mini(this, "\u2191");
+        sup.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                moveMap(e, -1);
+            }
+        });
+        Button sdown = Ui.mini(this, "\u2193");
+        sdown.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                moveMap(e, 1);
+            }
+        });
+        sortRow.addView(sort, Ui.weight(1f));
+        sortRow.addView(sup, Ui.weight(0.4f));
+        sortRow.addView(sdown, Ui.weight(0.4f));
+        box.addView(sortRow, rowLp());
+
+        LinearLayout loadRow = Ui.row(this);
+        Button loadBtn = Ui.mini(this, t("mm_load_no") + " "
+                + (load > 0 ? String.valueOf(load) : t("mm_load_none")));
+        loadBtn.setEnabled(e.listed);
+        loadBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                askMapLoadNumber(e, load);
+            }
+        });
+        Button lup = Ui.mini(this, "\u2191");
+        lup.setEnabled(e.listed);
+        lup.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                moveMapLoad(e, -1);
+            }
+        });
+        Button ldown = Ui.mini(this, "\u2193");
+        ldown.setEnabled(e.listed);
+        ldown.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                moveMapLoad(e, 1);
+            }
+        });
+        loadRow.addView(loadBtn, Ui.weight(1f));
+        loadRow.addView(lup, Ui.weight(0.4f));
+        loadRow.addView(ldown, Ui.weight(0.4f));
+        box.addView(loadRow, rowLp());
+
         box.setClickable(true);
-        box.setOnClickListener(this);
+        box.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                mapActions(e);
+            }
+        });
         return box;
     }
 
-    private void toggleMap(final int index) {
-        if (index < 0 || index >= maps.size()) {
+    private void toggleMap(final MapImporter.MapEntry e) {
+        if (e == null) {
             return;
         }
-        final MapImporter.MapEntry e = maps.get(index);
         final boolean on = !e.listed;
+        if (on && MapImporter.loadCount(this) >= MapImporter.MAX_LOAD) {
+            toast(t("mm_map_limit"));
+            return;
+        }
         boolean ok = on
                 ? MapImporter.registerCode(this, e.code)
                 : MapImporter.unregisterCode(this, e.code);
@@ -428,19 +691,61 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
-    private void moveMap(final int index, final int delta) {
-        if (index < 0 || index >= maps.size()) {
-            return;
-        }
-        final MapImporter.MapEntry e = maps.get(index);
-        boolean ok = MapImporter.moveCode(this, e.code, delta);
-        if (!ok) {
+    private void moveMap(final MapImporter.MapEntry e, final int delta) {
+        if (e == null || !MapImporter.moveMap(this, e.code, delta)) {
             toast(t("mm_op_failed"));
             return;
         }
-        LogStore.event(this, "map " + e.code + " move " + delta);
+        LogStore.event(this, "map " + e.code + " sort " + delta);
         showTab(TAB_MAPS);
         promptRestart();
+    }
+
+    private void moveMapLoad(final MapImporter.MapEntry e, final int delta) {
+        if (e == null || !MapImporter.moveMapLoad(this, e.code, delta)) {
+            toast(t("mm_op_failed"));
+            return;
+        }
+        LogStore.event(this, "map " + e.code + " load " + delta);
+        showTab(TAB_MAPS);
+        promptRestart();
+    }
+
+    private void askMapNumber(final MapImporter.MapEntry e, int current) {
+        askNumber(t("mm_sort_no"), current, new NumberSink() {
+            public void apply(int n) {
+                if (!MapImporter.setMapIndex(ModManagerActivity.this, e.code, n)) {
+                    toast(t("mm_op_failed"));
+                    return;
+                }
+                showTab(TAB_MAPS);
+            }
+        });
+    }
+
+    private void askMapLoadNumber(final MapImporter.MapEntry e, int current) {
+        askNumber(t("mm_load_no"), current < 1 ? 1 : current, new NumberSink() {
+            public void apply(int n) {
+                if (!MapImporter.setMapLoadIndex(ModManagerActivity.this, e.code, n)) {
+                    toast(t("mm_op_failed"));
+                    return;
+                }
+                showTab(TAB_MAPS);
+            }
+        });
+    }
+
+    private void askDeleteMap(final MapImporter.MapEntry e) {
+        confirm(t("mm_del_map") + "\n\n" + e.display(this), new Runnable() {
+            public void run() {
+                String r = MapImporter.remove(getApplicationContext(), e.code);
+                toast("ok".equals(r) ? t("mm_deleted") : t("mm_del_failed"));
+                showTab(TAB_MAPS);
+                if ("ok".equals(r)) {
+                    promptRestart();
+                }
+            }
+        });
     }
 
     private void mapActions(final MapImporter.MapEntry e) {
@@ -686,7 +991,8 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
             }
         } else if ("ok".equals(r)) {
             ok = true;
-            msg = t("mm_import_ok");
+            int n = ModImporter.lastInstalledIds.size();
+            msg = n > 1 ? (t("mm_import_multi") + "  " + n) : t("mm_import_ok");
             if (ModImporter.lastInstalledId != null && ModImporter.lastInstalledId.length() > 0) {
                 msg = msg + "  " + ModImporter.lastInstalledId;
             }
@@ -699,7 +1005,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
             LogStore.event(this, "manager import " + (isMap ? "map" : "mod") + " -> " + r);
         } catch (Throwable t) {
         }
-        page = 0;
         showTab(isMap ? TAB_MAPS : TAB_MODS);
         if (ok) {
             promptRestart();
@@ -744,17 +1049,10 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
             openFolder(ModImporter.modRoot(this));
         } else if (id == ID_OPEN_MAPS) {
             openFolder(MapImporter.mapsRoot(this));
-        } else if (id == ID_PREV) {
-            if (page > 0) {
-                page--;
-            }
-            showTab(TAB_MAPS);
-        } else if (id == ID_NEXT) {
-            int pages = Math.max(1, (maps.size() + PAGE_SIZE - 1) / PAGE_SIZE);
-            if (page < pages - 1) {
-                page++;
-            }
-            showTab(TAB_MAPS);
+        } else if (id == ID_MOD_JUMP) {
+            askJump(false);
+        } else if (id == ID_MAP_JUMP) {
+            askJump(true);
         } else if (id == ID_META) {
             metaOpen = true;
             showTab(TAB_ABOUT);
@@ -777,22 +1075,94 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
             openUrl(URL_AFDIAN);
         } else if (id == ID_MAIL) {
             openUrl("mailto:" + URL_MAIL);
-        } else if (id >= ID_SLOT_ON && id < ID_SLOT_ON + MAX_SLOTS) {
-            toggleSlot(id - ID_SLOT_ON);
-        } else if (id >= ID_SLOT_DEL && id < ID_SLOT_DEL + MAX_SLOTS) {
-            askDeleteMod(id - ID_SLOT_DEL);
-        } else if (id >= ID_MAP_ON && id < ID_MAP_ON + PAGE_SIZE) {
-            toggleMap(page * PAGE_SIZE + id - ID_MAP_ON);
-        } else if (id >= ID_MAP_UP && id < ID_MAP_UP + PAGE_SIZE) {
-            moveMap(page * PAGE_SIZE + id - ID_MAP_UP, -1);
-        } else if (id >= ID_MAP_DOWN && id < ID_MAP_DOWN + PAGE_SIZE) {
-            moveMap(page * PAGE_SIZE + id - ID_MAP_DOWN, 1);
-        } else if (id >= ID_MAP_ROW && id < ID_MAP_ROW + PAGE_SIZE) {
-            int i = page * PAGE_SIZE + id - ID_MAP_ROW;
-            if (i >= 0 && i < maps.size()) {
-                mapActions(maps.get(i));
-            }
         }
+    }
+
+    /** Callback of the number dialog; the value is at least 1. */
+    private interface NumberSink {
+        void apply(int n);
+    }
+
+    private void askNumber(String title, int current, final NumberSink sink) {
+        final EditText in = new EditText(this);
+        in.setInputType(InputType.TYPE_CLASS_NUMBER);
+        in.setText(String.valueOf(current));
+        try {
+            new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle(title)
+                    .setView(in)
+                    .setPositiveButton(t("mm_ok"), new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface d, int which) {
+                            int n;
+                            try {
+                                n = Integer.parseInt(in.getText().toString().trim());
+                            } catch (Throwable t) {
+                                n = -1;
+                            }
+                            if (n < 1) {
+                                toast(t("mm_jump_bad"));
+                                return;
+                            }
+                            sink.apply(n);
+                        }
+                    })
+                    .setNegativeButton(t("mm_cancel"), null)
+                    .show();
+        } catch (Throwable t) {
+            toast(String.valueOf(t));
+        }
+    }
+
+    private void askJump(final boolean isMap) {
+        int total = isMap ? maps.size() : slots.size();
+        if (total <= 0) {
+            toast(t("mm_jump_bad"));
+            return;
+        }
+        askNumber(t("mm_jump_title") + "  1 - " + total, 1, new NumberSink() {
+            public void apply(int n) {
+                jumpTo(isMap, n);
+            }
+        });
+    }
+
+    /** Clears the filter, marks the row with this library number and scrolls to it. */
+    private void jumpTo(boolean isMap, int oneBased) {
+        if (searchBox != null) {
+            searchBox.setText("");
+        }
+        if (oneBased < 1 || oneBased > rowViews.size()) {
+            toast(t("mm_jump_bad"));
+            return;
+        }
+        final View v = rowViews.get(oneBased - 1);
+        final android.graphics.drawable.Drawable keep = v.getBackground();
+        v.setBackground(Ui.cardBgMarked(this));
+        v.postDelayed(new Runnable() {
+            public void run() {
+                try {
+                    v.setBackground(keep);
+                } catch (Throwable t) {
+                }
+            }
+        }, 2000);
+        scrollTo(v);
+    }
+
+    private void scrollTo(View v) {
+        if (scroller == null || v == null) {
+            return;
+        }
+        int y = 0;
+        View x = v;
+        while (x != null && !(x.getParent() instanceof ScrollView)) {
+            y += x.getTop();
+            x = (View) x.getParent();
+        }
+        if (x != null) {
+            y += x.getTop();
+        }
+        scroller.smoothScrollTo(0, Math.max(0, y - Ui.dp(this, 40)));
     }
 
     private String t(String key) {

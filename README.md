@@ -8,9 +8,13 @@ the mod directory and permissions are shared with the game.
 
 * On launch a prompt asks "use the mod manager?": "Yes" opens the manager, "No" or the
   15-second timeout goes straight into the game.
-* The manager has three tabs: **Mods** (enable / disable / delete / import, 5 fixed slots),
-  **Maps** (paged browsing and import of custom maps) and **About** (version, website,
+* The manager has three tabs: **Mods** (enable / disable / delete / import),
+  **Maps** (import, enable / disable, thumbnails) and **About** (version, website,
   repository, author).
+* Both lists are one continuous scrolling list with no cap on the number of mods or maps: a
+  search box at the top filters by name, code or number, a "Jump" button scrolls to a given line,
+  and every row has its own order number (and, for maps, an in-game load number) with up/down
+  buttons and a "set the number" dialog.
 * 28 UI languages, switchable from the title bar at any time, without affecting the game.
 * The manager is appended as an extra `classes4.dex`, so the existing dex files and the
   huge `.so` entries are never rewritten.
@@ -22,7 +26,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 pwsh -File core/tools/prepare_work.ps1 -GameApk "D:\APK\your-firefight.apk"  # decode + patch
 pwsh -File core/tools/build.ps1                                             # compile + inject + sign
 pwsh -File core/tools/verify_apk.ps1                                        # static verification
-adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.0.apk
+adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.1.apk
 ```
 
 `pwsh` in the examples is PowerShell 7; under Windows PowerShell 5.1 use `powershell -File` instead (both work).

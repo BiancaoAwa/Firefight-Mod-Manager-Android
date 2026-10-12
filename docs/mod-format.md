@@ -50,6 +50,7 @@ Metadata and the index live in the library (`Mod-disabled/`), so `Mod/` stays pu
 | --- | --- |
 | `<base>/Mod-disabled/<id>/.ffm-meta` | Install metadata (import time, source, file count) |
 | `<base>/Mod-disabled/.ffm-enabled` | Id of the active mod (deliberately kept in the library so `Mod/` stays clean) |
+| `<base>/Mod-disabled/.ffm-order` | Display order of the library: one id per line. Unknown ids are ignored, ids that are missing from the file keep their library order at the end |
 | `<base>/Mod-disabled/.backup/<id>/<timestamp>/` | Automatic backup taken before an overwriting install |
 | `<base>/Mod-disabled/installed.json` | Index snapshot for humans (a derived file; the manager does not rely on it) |
 
@@ -73,6 +74,13 @@ in the UI simply means "its data is in `Mod/` right now".
 Two zip layouts are supported: a **flat package** (`mod.json` at the zip root) and a
 **single-top-directory package** (such as `example-mod/mod.json`, where the manager strips
 that directory level).
+
+Since round 11 an archive may also hold **several mods at once**: every directory that holds a
+`mod.txt` directly (down to a nesting depth of 4) becomes one mod, and `__MACOSX/`,
+`.DS_Store`, `Thumbs.db` and `desktop.ini` are dropped while unpacking. An id that appears
+twice inside the same archive is suffixed (`id_2`, `id_3`) instead of overwriting the earlier
+one. An archive without any `mod.txt` is treated as one single mod, as before; in that case a
+single top-level `Mod/` or `mod/` directory is stripped.
 
 An import always lands in `Mod-disabled/<id>/` first; it only moves to `Mod/` when the user
 taps "enable" in the UI, so a freshly imported mod cannot affect the game before you have
@@ -126,13 +134,19 @@ If you do not want the samples, delete `core/assets/Mod/` before running
 
 ### 2.2 Enable / disable and order
 
-The code table is the switch:
+The code table is the switch, but the order is kept by the manager:
 
 * the code is listed -> the map is enabled; deleting that line -> the map is disabled (the
   **map directory is left alone**, so it can be enabled again at any time);
-* the **line order in that file is the map order in the game**. The manager lists maps in that
-  order and offers "move up / move down", which swaps two lines and writes the file back
-  (comment and blank lines keep their position).
+* at most **27 codes** may be listed (`MapImporter.MAX_LOAD`); enabling one more is refused
+  with a message instead of growing the file;
+* the **display order** of all maps lives in `<base>/Custom Maps/.ffm-map-order` (one code per
+  line), so even maps that are not enabled can be arranged; the manager rewrites
+  `CustomMapCodeNames.txt` from that order, keeping comment and blank lines in their relative
+  positions;
+* the **line order of the listed codes in `CustomMapCodeNames.txt` is the load order in the
+  game**, and the manager shows it as the per-row "load number" with its own up/down buttons.
+  Maps that are not listed have no load number.
 
 ### 2.3 Map packages
 
@@ -143,6 +157,10 @@ Map packages downloaded from the internet are usually "an archive named after th
 The UI name comes from the first `<name>` under `<map>` in `<CODE>-scenarios.txt` (or
 `.dat`); if that cannot be read, the 4-character code is shown. The file size is the sum of
 all files inside that map directory.
+
+The row thumbnail is `<CODE>-map.jpg`; when that file is missing the manager falls back to any
+other `.jpg` / `.jpeg` / `.png` in the map directory whose name contains "map" (preferring one
+starting with the code), then to any image, and draws an empty frame when there is none.
 
 After a mod or map change the manager offers to restart the game, because the change only
 takes effect on the next start.

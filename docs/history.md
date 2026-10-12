@@ -224,6 +224,62 @@ Chinese twin under `docs/zh-CN/`.
 
 ---
 
+## Round 11: uncapped lists, search, numbering, thumbnails, version line
+
+**Requests**: (1) reading `mod.txt` during a mod import must be more tolerant of directory
+layouts; (2) the map rows need the `map.jpg` thumbnail; (3) mods and maps must no longer be
+limited in number -- one huge scrolling list instead; (4) a search filter; (5) show the order
+number of every mod and map in the list, editable; (6) show the in-game load number of a map
+(at most 27, without affecting the sorting); (7) up/down buttons for both numbers; (8) a "jump
+to line xx" function; (9) manager version 0.1.1.
+
+**How it was done**:
+
+* `ModImporter`: the display order moved into `Mod-disabled/.ffm-order` (one id per line) and
+  became the single source of the list order -- the active mod takes part in it by its id
+  instead of being pinned to the top. `installZip()` now scans the unpacked tree (depth 4) for
+  directories that hold a `mod.txt` directly and imports **each one as a mod**; an archive
+  without any `mod.txt` is still one mod, and `__MACOSX` / `.DS_Store` / `Thumbs.db` /
+  `desktop.ini` are dropped while unpacking. Duplicate ids inside one archive get a `_2` /
+  `_3` suffix.
+* `MapImporter`: the display order moved into `Custom Maps/.ffm-map-order`; the code table is
+  rewritten from that order with non-code lines kept in their relative positions. The load
+  order stays the line order of the listed codes, so a map now has two numbers (display order
+  and load number, the latter empty while the map is not listed). `MAX_LOAD = 27` is enforced
+  on registration: enabling one more map is refused instead of growing the file. `mapImage()`
+  finds the row thumbnail (`<CODE>-map.jpg` with fallbacks).
+* `ModManagerActivity`: paging is gone (`MAX_SLOTS` / `PAGE_SIZE` / the page field / the
+  id-range button dispatch), every row builds its own `OnClickListener` closure, and a search
+  row (permanently visible `EditText` + "Jump" button) sits on top of both lists. New helper
+  `askNumber()` backs the "set the number" dialogs; `jumpTo()` clears the filter, highlights
+  the target row for two seconds and scrolls to it.
+* `Ui`: new factories `searchBox()`, `mini()`, `thumb()` (down-scaled decode) and
+  `cardBgMarked()` for the jump highlight.
+* Layout: the title row gained a version line under it, and the root `ScrollView` applies the
+  window insets as padding so the title stays clear of the status bar and the display cutout.
+* Localisation: `l10n_round5.py` adds no English key and fills in the languages that previously
+  covered only part of the keys, so all 28 languages now cover all 201 keys. `mm_map_up` /
+  `mm_map_down` are gone (the map rows use the shared up/down labels).
+* Version: the manager reports 0.1.1; every other version number (package `versionCode 13200`,
+  game version 13.2.0) is unchanged.
+
+**Result**: 61 class files, `classes4.dex` 91540 bytes, `gen_l10n.py` reports 83 keys referenced
+by Java, all covered, and `201/201` for each of the 28 languages; `build.ps1` -> `BUILD OK`,
+`verify_apk.ps1` -> `RESULT: PASS` (G2..G9 all 0). 32 offline JVM checks over the pure helpers
+(`mergeOrder`, `listedSlots`, `moveIn`, `swapIn`, `firstCode`, `applyOrder`, `moveList`,
+`findModRoots`) pass without a device.
+
+**Traps hit in this round**:
+
+* Running a PowerShell script through `[scriptblock]::Create((Get-Content -Raw ...))` leaves
+  `$PSScriptRoot` empty, so `common.ps1` is never loaded; the script keeps going with null paths
+  and still prints a success banner. Run scripts as files, never as script blocks.
+* On a machine with only Windows PowerShell 5.1 (no `pwsh`), `& <script>.ps1` can fail with
+  `AuthorizationManager check failed`; `powershell -NoProfile -ExecutionPolicy Bypass -File
+  <script>` is the reliable form.
+
+---
+
 ## Traps hit (quick reference)
 
 | Trap | Lesson |
@@ -238,3 +294,5 @@ Chinese twin under `docs/zh-CN/`.
 | apktool rebuilding a several-hundred-MB package | Being slow is normal (3-8 minutes); log to a file, do not rely on terminal output |
 | Only wanting to edit a file in the worktree but being told "file no longer exists, re-read" | The filesystem layer has a version guard for delete-then-write; when recreating a same-named file, work around it (write under a new name, then rename) |
 | Removing or translating comments with a naive text replacement | It also rewrites Python docstrings and Chinese text inside string literals (five tool files broke outright); use a parser (`tokenize`) or an explicit "line number -> full new line" map, then run `py_compile` |
+| Running a build script as a script block (`[scriptblock]::Create((Get-Content -Raw ...))`) | `$PSScriptRoot` is empty inside a script block, so the shared library is never loaded, the variables stay null and the script still prints a success banner; run scripts as files |
+| `& <script>.ps1` failing with `AuthorizationManager check failed` under PowerShell 5.1 | Use `powershell -NoProfile -ExecutionPolicy Bypass -File <script>` |

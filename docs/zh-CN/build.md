@@ -11,7 +11,7 @@
 | `build.ps1` | 8 步构建：生成本地化 → 编译 → d8 → apktool 回编译 → 注入 dex → 对齐签名 |
 | `verify_apk.ps1` | 静态验证 G1–G9，全通过打印 `RESULT: PASS` 并以 0 退出 |
 | `smoke_test.ps1` | 上机冒烟：`adb install -r` → 启动 → 截图 → 抓 logcat/崩溃/目录清单 |
-| `gen_l10n.py` | 合并三份文案表，生成 `res/values*/ffm_strings.xml`，校验键 |
+| `gen_l10n.py` | 合并五份文案表，生成 `res/values*/ffm_strings.xml`，校验键 |
 | `patch_worktree.py` | 对工作树做幂等补丁（清单 + 示例模组 + 删旧 MyGame.smali） |
 | `inject_dex.py` | 把 `classes.dex` 以 `classes4.dex` 追加进 APK（不重写既有条目） |
 | `verify_apk.py` | G2 的 zip 层检查（dex 数量、`.so` 是否仍 stored） |
@@ -66,11 +66,11 @@ pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk
 ```
 [0/8] 检查工具链 ...            JDK / android.jar / build-tools / apktool / python
 [1/8] 生成 res/values*/ffm_strings.xml     语种数: 28 (+ 默认英文)
-                                            Java 实际引用的键: 74 个，全部已覆盖
+                                            Java 实际引用的键: 83 个，全部已覆盖
 [2/8] 备份并移除旧 MyGame.smali            backup -> core/backup/MyGame.smali.orig (48557 bytes)
 [3/8] javac 桩类（SDLActivity）
-[4/8] javac 管理器源码                     class 文件: 33
-[5/8] d8 -> classes.dex                    classes.dex: ≈65000 bytes
+[4/8] javac 管理器源码                     class 文件: 61
+[5/8] d8 -> classes.dex                    classes.dex: ≈90000 bytes
 [6/8] apktool 回编译工作树                 unsigned.apk: ≈259 MB
 [7/8] 注入 classes4.dex（append-only）     classes4.dex stored / stored-so-violations: 0
 [8/8] zipalign + apksigner                 signed: out\...apk (≈260 MB)
@@ -93,18 +93,17 @@ pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk
 
 ## 5. 改文案 / 加语言的流程
 
-1. 在 `core/tools/l10n_round4.py`（最新一轮；更早的键在 `l10n_round3.py` / `l10n_extra.py` /
-   `l10n_data.py`）里加键和译文；
+1. 在 `core/tools/l10n_round5.py`（最新一轮；更早的键在 `l10n_round4.py` / `l10n_round3.py` /
+   `l10n_extra.py` / `l10n_data.py`）里加键和译文；
 2. 在 Java 里用 `t("ffm_mm_你的键")` 引用；
 3. 跑 `build.ps1` —— `gen_l10n.py` 会校验「Java 用到但没定义」和「定义了却拼错」的键，
    不通过就中止。
 
-加语言：在 `gen_l10n.py` 的语种表里加 locale，并在三份数据表里补该语种的字典；
-缺的键会自动回落英文（构建日志会打印 `values-<locale> 43/186 键` 这样的覆盖率提示）。
+加语言：把该语种的字典加进 `l10n_round5.py`（或引入这些键的那一轮）；缺的键会自动回落英文
+（构建日志会打印 `values-<locale> 43/201 键` 这样的覆盖率提示）。
 
-> 现状：28 个语种里，10 个是「全量」（186 键，只差一个早已不再使用的遗留键
-> `about_github`），另外 18 个是早期版本只翻了首轮 43 个键，其余一律回落英文。
-> 想补全某个语种，就往对应的数据表里加键即可。
+> 现状：28 个语种都已覆盖全部 201 个键（`gen_l10n.py` 对每个语种都打印 `201/201`）。
+> 其中一部分较早的译文由早期自动流程产生，尚未经母语者校对。
 
 ## 6. 常见问题
 
