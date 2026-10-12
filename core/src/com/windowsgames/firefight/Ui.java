@@ -1,14 +1,21 @@
 package com.windowsgames.firefight;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.text.InputType;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import java.io.File;
 
 /**
  * Widget factory used to build every manager view in code; no XML layout is added to the game.
@@ -66,6 +73,13 @@ final class Ui {
         g.setCornerRadius(dp(c, 10));
         g.setColor(cardColor(c));
         g.setStroke(Math.max(1, dp(c, 1)), faded(c, 0x33));
+        return g;
+    }
+
+    /** Card background with an accent border, used to mark the row a jump landed on. */
+    static GradientDrawable cardBgMarked(Context c) {
+        GradientDrawable g = cardBg(c);
+        g.setStroke(Math.max(1, dp(c, 2)), accent(c));
         return g;
     }
 
@@ -181,5 +195,66 @@ final class Ui {
         v.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(c, h)));
         return v;
+    }
+
+    static EditText searchBox(Context c, String hint) {
+        EditText e = new EditText(c);
+        e.setSingleLine(true);
+        e.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+        e.setHint(hint == null ? "" : hint);
+        e.setHintTextColor(secondary(c));
+        e.setTextColor(primary(c));
+        e.setInputType(InputType.TYPE_CLASS_TEXT);
+        e.setPadding(dp(c, 8), dp(c, 6), dp(c, 8), dp(c, 6));
+        e.setBackground(cardBg(c));
+        return e;
+    }
+
+    /** Compact button for row arrows and numbering. Tall enough for a comfortable tap. */
+    static Button mini(Context c, String s) {
+        Button b = action(c, s);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f);
+        b.setMinWidth(dp(c, 44));
+        b.setMinimumWidth(dp(c, 44));
+        b.setMinHeight(dp(c, 38));
+        b.setMinimumHeight(dp(c, 38));
+        b.setPadding(dp(c, 8), dp(c, 6), dp(c, 8), dp(c, 6));
+        return b;
+    }
+
+    /** Square preview of an image file; an empty frame when the file cannot be decoded. */
+    static ImageView thumb(Context c, File f, float sizeDp) {
+        ImageView v = new ImageView(c);
+        int px = dp(c, sizeDp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(px, px);
+        lp.rightMargin = dp(c, 8);
+        v.setLayoutParams(lp);
+        v.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        v.setBackground(cardBg(c));
+        if (f != null) {
+            Bitmap bm = decode(f, px);
+            if (bm != null) {
+                v.setImageBitmap(bm);
+            }
+        }
+        return v;
+    }
+
+    private static Bitmap decode(File f, int want) {
+        try {
+            BitmapFactory.Options probe = new BitmapFactory.Options();
+            probe.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(f.getAbsolutePath(), probe);
+            int sample = 1;
+            int longest = Math.max(probe.outWidth, probe.outHeight);
+            while (longest > 0 && longest / sample > want * 2) {
+                sample *= 2;
+            }
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = sample;
+            return BitmapFactory.decodeFile(f.getAbsolutePath(), opts);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 }

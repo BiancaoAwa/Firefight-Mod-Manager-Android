@@ -13,10 +13,10 @@ param(
 $sdk = Resolve-AndroidSdk $AndroidSdk
 $adb = if ($sdk) { Join-Path $sdk "platform-tools\adb.exe" } else { "" }
 if (-not $adb -or -not (Test-Path $adb)) {
-Write-Output "adb not found; install Android SDK platform-tools, or pass -AndroidSdk <sdk dir>"
+    Write-Output "adb not found; install Android SDK platform-tools, or pass -AndroidSdk <sdk dir>"
     exit 1
 }
-if (-not $Apk) { $Apk = Join-Path $OutDir "Firefight-Mod-Manager-13.2.0-mgr0.1.0.apk" }
+if (-not $Apk) { $Apk = Join-Path $OutDir "Firefight-Mod-Manager-13.2.0-mgr0.1.1.apk" }
 $pkg  = $Package
 $act  = "com.windowsgames.firefight.MyGame"
 $shot = Join-Path $RepoDir "shots"
@@ -37,7 +37,7 @@ if (-not $ShotOnly) {
     "=== G8-1 adb install -r ==="
     & $adb install -r $apk 2>&1 | Select-Object -Last 5
 
-"=== G8-2 launching the game ==="
+    "=== G8-2 launching the game ==="
     & $adb shell am start -n "$pkg/$act" 2>&1
     Start-Sleep -Seconds 20
 }
@@ -56,7 +56,7 @@ if ($crash) { $crash | Select-Object -First 30 | ForEach-Object { $_.Line } } el
 & $adb shell ls -la "/storage/emulated/0/Android/data/$pkg/files/" 2>&1
 & $adb shell ls -la "/storage/emulated/0/Android/data/$pkg/files/Mod/" 2>&1
 
-"=== G8-7 log persistence (requirement 6) ==="
+"=== G8-7 log persistence ==="
 & $adb shell ls -la "/storage/emulated/0/Download/Firefight-Mod-Manager/$pkg/" 2>&1
 
 "=== G8-8 screenshots ==="

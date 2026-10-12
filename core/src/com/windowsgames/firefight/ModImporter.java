@@ -26,8 +26,13 @@ import java.util.zip.ZipInputStream;
  *   Mod/                     raw files of the one active mod, no sub-folder
  *   Mod-disabled/<id>/       installed mods that are not active
  *   Mod-disabled/.ffm-enabled   id of the active mod (kept out of Mod/)
+ *   Mod-disabled/.ffm-order     display order of the library, one id per line
  *   Mod-disabled/.backup/<id>/<timestamp>/
  *   Mod-disabled/installed.json
+ *
+ * A dropped archive may hold several mods: every folder that directly contains
+ * mod.txt becomes one library entry (see findModRoots). Archives without any
+ * mod.txt are installed as a single entry, as in earlier releases.
  *
  * Not implemented: rollback to a backup, duplicate detection between mods, dependency checks.
  */
@@ -37,6 +42,7 @@ public final class ModImporter {
     public static final String META = ".ffm-meta";
     public static final String BACKUP_DIR = ".backup";
     public static final String INDEX = "installed.json";
+    public static final String ORDER = ".ffm-order";
 
     public static class ModEntry {
         public String id = "";
@@ -295,6 +301,9 @@ public final class ModImporter {
 
     public static String lastInstalledId = "";
 
+    /** Ids installed by the most recent installZip call, in archive order. */
+    public static final List<String> lastInstalledIds = new ArrayList<String>();
+
     public static File disabledRoot(Context c) {
         File base = MyGame.rootOfStatic(c);
         if (base == null) {
@@ -419,24 +428,166 @@ public final class ModImporter {
         }
     }
 
+    /**
+     * Library in display order: the active mod and every installed mod, sorted by
+     * .ffm-order first and by id afterwards. Ids missing from the order file keep
+     * the alphabetical position they were read in.
+     */
     public static List<Slot> listSlots(Context c) {
-        List<Slot> out = new ArrayList<Slot>();
+        List<Slot> pool = new ArrayList<Slot>();
         File active = modRoot(c);
+        Slot on = null;
         if (hasData(active)) {
-            Slot s = new Slot();
-            s.dir = active;
-            s.enabled = true;
-            s.id = enabledId(c);
-            if (s.id.length() == 0) {
-                s.id = "Mod";
+            on = new Slot();
+            on.dir = active;
+            on.enabled = true;
+            on.id = enabledId(c);
+            if (on.id.length() == 0) {
+                on.id = "Mod";
             }
-            s.name = readName(active);
-            s.files = countFiles(active);
-            s.bytes = dirSize(active);
-            out.add(s);
+            on.name = readName(active);
+            on.files = countFiles(active);
+            on.bytes = dirSize(active);
         }
-        addSlots(out, disabledRoot(c), false);
+        addSlots(pool, disabledRoot(c), false);
+        if (on != null) {
+            pool.add(on);
+        }
+        return applyOrder(pool, readOrder(c));
+    }
+
+    /**
+     * Removes the ids named by order from pool in that order; entries order does not
+     * mention follow, keeping the order they were read in. pool is modified.
+     */
+    public static List<Slot> applyOrder(List<Slot> pool, List<String> order) {
+        List<Slot> out = new ArrayList<Slot>();
+        for (int i = 0; i < order.size(); i++) {
+            int at = indexOfId(pool, order.get(i));
+            if (at >= 0) {
+                out.add(pool.remove(at));
+            }
+        }
+        out.addAll(pool);
         return out;
+    }
+
+    /** Moves one element inside a list; false when the move is a no-op or out of range. */
+    public static boolean moveList(List<String> list, int from, int to) {
+        if (list == null || from < 0 || to < 0 || from >= list.size() || to >= list.size() || from == to) {
+            return false;
+        }
+        list.add(to, list.remove(from));
+        return true;
+    }
+
+    public static int indexOfId(List<Slot> list, String id) {
+        if (list == null || id == null) {
+            return -1;
+        }
+        for (int i = 0; i < list.size(); i++) {
+            if (id.equals(list.get(i).id)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public static List<String> idsOf(List<Slot> list) {
+        List<String> ids = new ArrayList<String>();
+        for (int i = 0; i < list.size(); i++) {
+            ids.add(list.get(i).id);
+        }
+        return ids;
+    }
+
+    /** Ids recorded in .ffm-order, one per line; empty when the file is absent. */
+    public static List<String> readOrder(Context c) {
+        List<String> out = new ArrayList<String>();
+        File root = disabledRoot(c);
+        if (root == null) {
+            return out;
+        }
+        File f = new File(root, ORDER);
+        if (!f.isFile()) {
+            return out;
+        }
+        try {
+            String text = readText(new FileInputStream(f));
+            String[] lines = text.split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i].trim();
+                if (line.length() > 0) {
+                    out.add(line);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
+    private static void writeOrder(Context c, List<String> ids) {
+        File root = disabledRoot(c);
+        if (root == null) {
+            return;
+        }
+        try {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < ids.size(); i++) {
+                sb.append(ids.get(i)).append('\n');
+            }
+            FileOutputStream out = new FileOutputStream(new File(root, ORDER), false);
+            out.write(sb.toString().getBytes("UTF-8"));
+            out.close();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** Moves one library entry delta places (negative is up) and stores the new order. */
+    public static boolean moveSlot(Context c, Slot s, int delta) {
+        if (s == null || delta == 0) {
+            return false;
+        }
+        List<Slot> list = listSlots(c);
+        int at = indexOfId(list, s.id);
+        int to = at + delta;
+        if (at < 0 || to < 0 || to >= list.size()) {
+            return false;
+        }
+        List<String> ids = idsOf(list);
+        if (!moveList(ids, at, to)) {
+            return false;
+        }
+        writeOrder(c, ids);
+        return true;
+    }
+
+    /** Moves one library entry to a 1-based position and stores the new order. */
+    public static boolean setSlotIndex(Context c, Slot s, int oneBased) {
+        if (s == null) {
+            return false;
+        }
+        List<Slot> list = listSlots(c);
+        int at = indexOfId(list, s.id);
+        if (at < 0) {
+            return false;
+        }
+        int to = oneBased - 1;
+        if (to < 0) {
+            to = 0;
+        }
+        if (to >= list.size()) {
+            to = list.size() - 1;
+        }
+        if (to == at) {
+            return false;
+        }
+        List<String> ids = idsOf(list);
+        if (!moveList(ids, at, to)) {
+            return false;
+        }
+        writeOrder(c, ids);
+        return true;
     }
 
     private static void addSlots(List<Slot> out, File root, final boolean enabled) {
@@ -640,7 +791,14 @@ public final class ModImporter {
         }
     }
 
+    /**
+     * Installs one archive. Every folder holding mod.txt directly becomes a library
+     * entry; an archive without mod.txt becomes a single entry. Returns "ok" when at
+     * least one entry was installed, "fail" otherwise.
+     */
     public static String installZip(InputStream in, File modRoot, String suggestedName) {
+        lastInstalledIds.clear();
+        lastInstalledId = "";
         if (modRoot == null) {
             return "fail";
         }
@@ -653,37 +811,160 @@ public final class ModImporter {
                 deleteTree(tmp);
                 return "fail";
             }
-            ModEntry e = readModJson(tmp);
-            if (e.id == null || e.id.length() == 0) {
-                e.id = safeName(suggestedName == null ? "mod" : suggestedName);
-                if (e.id.endsWith(".zip") || e.id.endsWith(".ffmod")) {
-                    e.id = e.id.substring(0, e.id.lastIndexOf('.'));
+            List<File> roots = findModRoots(tmp);
+            if (roots.isEmpty()) {
+                roots.add(tmp);
+            }
+            String base = suggestedName == null ? "" : suggestedName.trim();
+            int dot = base.lastIndexOf('.');
+            if (dot > 0) {
+                base = base.substring(0, dot);
+            }
+            base = safeName(base);
+            if (base.length() == 0) {
+                base = "mod";
+            }
+            List<String> used = new ArrayList<String>();
+            for (int i = 0; i < roots.size(); i++) {
+                File rd = roots.get(i);
+                if (!hasData(rd)) {
+                    continue;
                 }
-            }
-            if (e.id.length() == 0) {
-                e.id = "mod_" + System.currentTimeMillis();
-            }
-            e.id = safeName(e.id);
-            backup(modRoot, e.id);
-            File dst = new File(modRoot, e.id);
-            if (dst.exists()) {
-                deleteTree(dst);
-            }
-            if (!tmp.renameTo(dst) && !dst.isDirectory()) {
-                if (!dst.mkdirs()) {
+                ModEntry e = readModJson(rd);
+                if (e.id == null || e.id.length() == 0) {
+                    e.id = base;
+                }
+                e.id = safeName(e.id);
+                if (e.id.length() == 0) {
+                    e.id = base;
+                }
+                if (e.name == null || e.name.length() == 0) {
+                    e.name = e.id;
+                }
+                e.id = uniqueId(modRoot, e.id, used);
+                used.add(e.id);
+                backup(modRoot, e.id);
+                File dst = new File(modRoot, e.id);
+                if (dst.exists() && !deleteTree(dst)) {
+                    continue;
+                }
+                if (!dst.mkdirs() && !dst.isDirectory()) {
+                    continue;
+                }
+                if (!moveData(rd, dst)) {
+                    deleteTree(dst);
+                    continue;
+                }
+                if (rd.equals(tmp)) {
                     deleteTree(tmp);
-                    return "fail";
                 }
-                copyTree(tmp, dst);
-                deleteTree(tmp);
+                finishInstall(e, dst, modRoot, "file:" + suggestedName);
+                lastInstalledIds.add(e.id);
             }
-            finishInstall(e, dst, modRoot, "file:" + suggestedName);
-            lastInstalledId = e.id;
+            deleteTree(tmp);
+            if (lastInstalledIds.isEmpty()) {
+                return "fail";
+            }
+            lastInstalledId = lastInstalledIds.get(0);
+            writeIndex(modRoot);
             return "ok";
         } catch (Throwable t) {
             deleteTree(tmp);
             return "fail";
         }
+    }
+
+    /**
+     * Folders that directly contain mod.txt, at most four levels below tree.
+     * The search does not descend into a folder it already accepted; a folder that
+     * contains another accepted folder is dropped in favour of the outer one.
+     */
+    public static List<File> findModRoots(File tree) {
+        final List<File> found = new ArrayList<File>();
+        collectModRoots(tree, 4, found);
+        List<File> out = new ArrayList<File>();
+        for (int i = 0; i < found.size(); i++) {
+            File f = found.get(i);
+            boolean nested = false;
+            for (int j = 0; j < found.size(); j++) {
+                if (i != j && isInside(f, found.get(j))) {
+                    nested = true;
+                    break;
+                }
+            }
+            if (!nested) {
+                out.add(f);
+            }
+        }
+        return out;
+    }
+
+    private static void collectModRoots(File dir, int depth, List<File> out) {
+        if (dir == null || !dir.isDirectory() || depth < 0) {
+            return;
+        }
+        if (new File(dir, "mod.txt").isFile()) {
+            out.add(dir);
+            return;
+        }
+        File[] kids = dir.listFiles();
+        if (kids == null) {
+            return;
+        }
+        Arrays.sort(kids, new Comparator<File>() {
+            public int compare(File a, File b) {
+                return a.getName().compareToIgnoreCase(b.getName());
+            }
+        });
+        for (int i = 0; i < kids.length; i++) {
+            File k = kids[i];
+            if (k.isDirectory() && !k.getName().startsWith(".") && !isJunkName(k.getName())) {
+                collectModRoots(k, depth - 1, out);
+            }
+        }
+    }
+
+    private static boolean isInside(File child, File parent) {
+        File p = child;
+        while (p != null) {
+            if (p.equals(parent)) {
+                return true;
+            }
+            p = p.getParentFile();
+        }
+        return false;
+    }
+
+    /** Appends _2, _3 ... until the id is free among ids used by the same archive. */
+    private static String uniqueId(File modRoot, String id, List<String> used) {
+        String candidate = id;
+        int n = 2;
+        while (used.contains(candidate)) {
+            candidate = id + "_" + n;
+            n++;
+        }
+        return candidate;
+    }
+
+    private static boolean isJunkName(String name) {
+        if (name == null) {
+            return false;
+        }
+        return "__MACOSX".equals(name) || ".DS_Store".equals(name) || "Thumbs.db".equals(name)
+                || "desktop.ini".equals(name) || name.equalsIgnoreCase("__MACOSX");
+    }
+
+    private static boolean isJunkPath(String name) {
+        if (name == null) {
+            return false;
+        }
+        String[] parts = name.split("/");
+        for (int i = 0; i < parts.length; i++) {
+            if (isJunkName(parts[i])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ModEntry readModJson(File dir) {
@@ -778,7 +1059,7 @@ public final class ModImporter {
                 if (name.startsWith("/")) {
                     name = name.substring(1);
                 }
-                if (name.length() == 0 || name.contains("..")) {
+                if (name.length() == 0 || name.contains("..") || isJunkPath(name)) {
                     zin.closeEntry();
                     continue;
                 }

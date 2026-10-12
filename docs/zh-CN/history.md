@@ -189,6 +189,48 @@ Python 走 `tokenize` 只删 `COMMENT`，PowerShell 逐行做引号感知），�
 
 ---
 
+## 第 11 轮：列表不设上限、搜索、编号、缩略图、版本行
+
+**需求**：①导入模组时读取 `mod.txt` 的目录查找要更宽容；②地图行要显示 `map.jpg` 缩略图；
+③模组与地图都不再限制数量，改成一条巨型滚动列表；④加搜索过滤；⑤显示每行模组/地图的排序编号
+并允许修改；⑥显示地图的游戏内加载编号（最多 27 个，不影响排序）；⑦两种编号都要有上移下移；
+⑧「跳转到第 xx 行」；⑨管理器版本 0.1.1。
+
+**怎么改的**：
+
+* `ModImporter`：显示顺序改由 `Mod-disabled/.ffm-order`（一行一个 id）决定，成为列表顺序的
+  唯一来源——活动模组按自己的 id 参与排序，不再固定在首位。`installZip()` 改为扫描解压结果
+  （下钻 4 层），把每个直接含 `mod.txt` 的目录**各导入为一个模组**；一个 `mod.txt` 都没有的包
+  仍按单个模组处理；解压时丢弃 `__MACOSX` / `.DS_Store` / `Thumbs.db` / `desktop.ini`。同一个包内
+  重复的 id 会加 `_2` / `_3` 后缀。
+* `MapImporter`：显示顺序移到 `Custom Maps/.ffm-map-order`；代码表按该顺序重写，非代码行保持原有
+  相对位置。加载顺序仍是码表里已登记代码的行序，因此一张地图有两个编号（排序编号与加载编号，
+  未登记时没有加载编号）。登记时执行 `MAX_LOAD = 27`：再启用一张会被拒绝，不会继续写文件。
+  `mapImage()` 负责找行首缩略图（`<CODE>-map.jpg` 及其回退）。
+* `ModManagerActivity`：删除分页（`MAX_SLOTS` / `PAGE_SIZE` / `page` 字段 / id 区间分派），每个
+  列表项自带 `OnClickListener` 闭包；两个列表顶部都加搜索行（常驻 `EditText` + 「跳转」按钮）。
+  新增 `askNumber()` 支撑「设置编号」弹窗；`jumpTo()` 先清空过滤、把目标行高亮两秒并滚动过去。
+* `Ui`：新增 `searchBox()`、`mini()`、`thumb()`（带降采样解码）与跳转高亮用的 `cardBgMarked()`。
+* 布局：标题行下方加版本行；根 `ScrollView` 把窗口 insets 作为内边距，标题不被状态栏与刘海遮住。
+* 本地化：`l10n_round5.py` 不含英文键，只补齐此前只有部分译文的语种，28 个语种现已全部覆盖
+  201 个键。`mm_map_up` / `mm_map_down` 已删除（地图行改用通用的上移/下移标签）。
+* 版本：管理器报 0.1.1；其它版本号（包 `versionCode 13200`、游戏 13.2.0）一律不变。
+
+**结果**：class 文件 61 个、`classes4.dex` 91540 字节、`gen_l10n.py` 报 Java 引用的 83 个键全部
+已覆盖且 28 个语种均为 `201/201`；`build.ps1` → `BUILD OK`，`verify_apk.ps1` → `RESULT: PASS`
+（G2..G9 全 0）。另有 32 项离线 JVM 用例覆盖纯函数（`mergeOrder`、`listedSlots`、`moveIn`、
+`swapIn`、`firstCode`、`applyOrder`、`moveList`、`findModRoots`），无需设备即可运行。
+
+**本轮踩的坑**：
+
+* 用 `[scriptblock]::Create((Get-Content -Raw ...))` 跑 PowerShell 脚本时 `$PSScriptRoot` 为空，
+  `common.ps1` 不会被加载；脚本带着空路径继续跑，最后仍打印成功横幅。脚本必须按文件执行。
+* 只有 Windows PowerShell 5.1（没有 `pwsh`）的机器上，`& <脚本>.ps1` 会报
+  `AuthorizationManager check failed`；可靠写法是
+  `powershell -NoProfile -ExecutionPolicy Bypass -File <脚本>`。
+
+---
+
 ## 踩过的坑（速查）
 
 | 坑 | 教训 |
@@ -203,3 +245,5 @@ Python 走 `tokenize` 只删 `COMMENT`，PowerShell 逐行做引号感知），�
 | apktool 回编译几百 MB 的包 | 慢是正常的（3–8 分钟），日志写文件，别指望终端输出 |
 | 只是想改工作树里的文件，却被报「文件不存在，重新读」 | 文件系统层对「先删后写」有版本守卫；重新创建同名文件时换个思路（先写到新名字再改名） |
 | 用朴素文本替换「删注释 / 翻注释」 | 会把 Python docstring、字符串里的中文一起改掉（5 个工具文件直接语法崩）；必须用解析器（`tokenize`）或「显式行号 → 整行新文本」的映射，改完跑 `py_compile` |
+| 用 `[scriptblock]::Create((Get-Content -Raw ...))` 跑构建脚本 | scriptblock 里 `$PSScriptRoot` 为空，公共库不会被加载，变量全为 null，脚本却仍打印成功横幅；脚本要按文件执行 |
+| PowerShell 5.1 下 `& <脚本>.ps1` 报 `AuthorizationManager check failed` | 改用 `powershell -NoProfile -ExecutionPolicy Bypass -File <脚本>` |

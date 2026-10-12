@@ -25,7 +25,9 @@ import java.util.zip.ZipInputStream;
  *
  * A map lives in <external files>/Custom Maps/<CODE>/, and the game only loads a code that is
  * listed in CustomMapCodeNames.txt. The line order of that file is the map order in the game,
- * and removing a line disables the map without deleting it.
+ * and removing a line disables the map without deleting it. The manager keeps the same order in
+ * Custom Maps/.ffm-map-order and rebuilds the code table from it, so maps without a list entry
+ * keep their place in the list. At most MAX_LOAD maps can be listed at once.
  *
  * Not implemented: editing a map, uploading a map, checking that all files of a map belong
  * together.
@@ -35,6 +37,10 @@ public final class MapImporter {
 
     public static final String DIR = "Custom Maps";
     public static final String CODES = "CustomMapCodeNames.txt";
+    /** Display order of the map list, one code per line; keeps maps without a list entry in place. */
+    public static final String ORDER = ".ffm-map-order";
+    /** The game loads at most this many listed maps. */
+    public static final int MAX_LOAD = 27;
 
     private static final Pattern CODE = Pattern.compile("^[A-Za-z0-9]{4}$");
 
@@ -144,6 +150,10 @@ public final class MapImporter {
         return r == null ? null : new File(r, CODES);
     }
 
+    /**
+     * All entries: folders first in display order (.ffm-map-order, then the code table,
+     * then the remaining folders by name), followed by listed codes without a folder.
+     */
     public static List<MapEntry> listMaps(Context c) {
         Map<String, MapEntry> byCode = new LinkedHashMap<String, MapEntry>();
         File root = mapsRoot(c);
@@ -171,20 +181,297 @@ public final class MapImporter {
                 }
             }
         }
+        List<String> listed = readCodes(c);
         List<MapEntry> out = new ArrayList<MapEntry>();
-        List<String> codes = readCodes(c);
-        for (int i = 0; i < codes.size(); i++) {
-            String code = codes.get(i);
-            MapEntry e = byCode.remove(code.toUpperCase(Locale.US));
+        List<String> order = displayOrder(c, new ArrayList<String>(byCode.keySet()), listed);
+        for (int i = 0; i < order.size(); i++) {
+            String code = order.get(i);
+            MapEntry e = byCode.remove(code);
             if (e == null) {
-                e = new MapEntry();
-                e.code = code;
+                continue;
             }
+            e.listed = listed.contains(code);
+            out.add(e);
+        }
+        for (int i = 0; i < listed.size(); i++) {
+            if (byCode.remove(listed.get(i)) != null) {
+                continue;
+            }
+            MapEntry e = new MapEntry();
+            e.code = listed.get(i);
             e.listed = true;
             out.add(e);
         }
-        out.addAll(byCode.values());
         return out;
+    }
+
+    /**
+     * Codes of folders that exist, in display order. The saved order wins, codes it does
+     * not mention follow the code table and then the alphabetical folder order.
+     */
+    private static List<String> displayOrder(Context c, List<String> present, List<String> listed) {
+        return mergeOrder(readOrder(c), listed, present);
+    }
+
+    /**
+     * Codes of folders that exist, in display order: saved order first, then the code
+     * table, then the remaining folder order. Duplicates and absent folders drop out.
+     */
+    public static List<String> mergeOrder(List<String> saved, List<String> listed, List<String> present) {
+        List<String> out = new ArrayList<String>();
+        addPresent(saved, present, out);
+        addPresent(listed, present, out);
+        addPresent(present, present, out);
+        return out;
+    }
+
+    private static void addPresent(List<String> src, List<String> present, List<String> out) {
+        for (int i = 0; i < src.size(); i++) {
+            String s = src.get(i);
+            if (present.contains(s) && !out.contains(s)) {
+                out.add(s);
+            }
+        }
+    }
+
+    /** 0-based positions of the listed codes inside a display order. */
+    public static List<Integer> listedSlots(List<String> order, List<String> listed) {
+        List<Integer> out = new ArrayList<Integer>();
+        for (int i = 0; i < order.size(); i++) {
+            if (listed.contains(order.get(i))) {
+                out.add(Integer.valueOf(i));
+            }
+        }
+        return out;
+    }
+
+    /** Exchanges two elements of a list; false when a position is out of range. */
+    public static boolean swapIn(List<String> list, int a, int b) {
+        if (list == null || a < 0 || b < 0 || a >= list.size() || b >= list.size()) {
+            return false;
+        }
+        String tmp = list.get(a);
+        list.set(a, list.get(b));
+        list.set(b, tmp);
+        return true;
+    }
+
+    /** Codes of folders that exist, in display order. */
+    public static List<String> presentOrder(Context c) {
+        List<MapEntry> all = listMaps(c);
+        List<String> out = new ArrayList<String>();
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).present) {
+                out.add(all.get(i).code.toUpperCase(Locale.US));
+            }
+        }
+        return out;
+    }
+
+    public static List<String> readOrder(Context c) {
+        List<String> out = new ArrayList<String>();
+        File root = mapsRoot(c);
+        if (root == null) {
+            return out;
+        }
+        File f = new File(root, ORDER);
+        if (!f.isFile()) {
+            return out;
+        }
+        try {
+            String[] lines = readText(new FileInputStream(f)).split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                String s = lines[i].replace("\r", "").trim().toUpperCase(Locale.US);
+                if (CODE.matcher(s).matches() && !out.contains(s)) {
+                    out.add(s);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
+    private static void writeOrder(Context c, List<String> codes) {
+        File root = mapsRoot(c);
+        if (root == null) {
+            return;
+        }
+        try {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < codes.size(); i++) {
+                sb.append(codes.get(i)).append('\n');
+            }
+            writeText(new File(root, ORDER), sb.toString());
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** Writes the display order and rebuilds the code table from it. */
+    private static boolean applyOrder(Context c, List<String> codes) {
+        writeOrder(c, codes);
+        return syncCodes(c);
+    }
+
+    /** Moves one element inside a list; false when the move is a no-op or out of range. */
+    public static boolean moveIn(List<String> list, int from, int to) {
+        if (list == null || from < 0 || to < 0 || from >= list.size() || to >= list.size() || from == to) {
+            return false;
+        }
+        list.add(to, list.remove(from));
+        return true;
+    }
+
+    /** Moves one map delta places in the display order, negative is up. */
+    public static boolean moveMap(Context c, String code, int delta) {
+        List<String> order = presentOrder(c);
+        int at = order.indexOf(upper(code));
+        if (!moveIn(order, at, at + delta)) {
+            return false;
+        }
+        return applyOrder(c, order);
+    }
+
+    /** Moves one map to a 1-based display position. */
+    public static boolean setMapIndex(Context c, String code, int oneBased) {
+        List<String> order = presentOrder(c);
+        int at = order.indexOf(upper(code));
+        if (at < 0) {
+            return false;
+        }
+        int to = oneBased - 1;
+        if (to < 0) {
+            to = 0;
+        }
+        if (to >= order.size()) {
+            to = order.size() - 1;
+        }
+        if (to == at) {
+            return false;
+        }
+        if (!moveIn(order, at, to)) {
+            return false;
+        }
+        return applyOrder(c, order);
+    }
+
+    /**
+     * Moves one listed map delta places among the listed maps, negative is up. Maps
+     * without a list entry keep their folder and are skipped.
+     */
+    public static boolean moveMapLoad(Context c, String code, int delta) {
+        if (delta == 0) {
+            return false;
+        }
+        List<String> order = presentOrder(c);
+        List<Integer> slots = listedSlots(order, readCodes(c));
+        int at = slots.indexOf(Integer.valueOf(order.indexOf(upper(code))));
+        int to = at + (delta < 0 ? -1 : 1);
+        if (at < 0 || to < 0 || to >= slots.size()) {
+            return false;
+        }
+        if (!swapIn(order, slots.get(at).intValue(), slots.get(to).intValue())) {
+            return false;
+        }
+        return applyOrder(c, order);
+    }
+
+    /** Moves one listed map to a 1-based position among the listed maps. */
+    public static boolean setMapLoadIndex(Context c, String code, int oneBased) {
+        List<String> order = presentOrder(c);
+        List<Integer> slots = listedSlots(order, readCodes(c));
+        int at = slots.indexOf(Integer.valueOf(order.indexOf(upper(code))));
+        if (at < 0) {
+            return false;
+        }
+        int to = oneBased - 1;
+        if (to < 0) {
+            to = 0;
+        }
+        if (to >= slots.size()) {
+            to = slots.size() - 1;
+        }
+        if (to == at) {
+            return false;
+        }
+        if (!swapIn(order, slots.get(at).intValue(), slots.get(to).intValue())) {
+            return false;
+        }
+        return applyOrder(c, order);
+    }
+
+    /** 1-based position among the listed maps, -1 when the map is not listed. */
+    public static int loadIndexOf(Context c, String code) {
+        List<String> order = presentOrder(c);
+        List<Integer> slots = listedSlots(order, readCodes(c));
+        int at = slots.indexOf(Integer.valueOf(order.indexOf(upper(code))));
+        return at < 0 ? -1 : at + 1;
+    }
+
+    /** Number of listed maps that have a folder. */
+    public static int loadCount(Context c) {
+        return listedSlots(presentOrder(c), readCodes(c)).size();
+    }
+
+    private static String upper(String code) {
+        return code == null ? "" : code.toUpperCase(Locale.US);
+    }
+
+    /** Rewrites the code table so its line order matches the display order. */
+    public static boolean syncCodes(Context c) {
+        File f = codesFile(c);
+        if (f == null) {
+            return false;
+        }
+        try {
+            List<String> listed = readCodes(c);
+            List<String> want = new ArrayList<String>();
+            List<String> order = presentOrder(c);
+            for (int i = 0; i < order.size(); i++) {
+                if (listed.contains(order.get(i))) {
+                    want.add(order.get(i));
+                }
+            }
+            for (int i = 0; i < listed.size(); i++) {
+                if (!want.contains(listed.get(i))) {
+                    want.add(listed.get(i));
+                }
+            }
+            String text = f.isFile() ? readText(new FileInputStream(f)) : "";
+            String[] lines = text.split("\n", -1);
+            List<String> others = new ArrayList<String>();
+            Map<String, String> codeLine = new LinkedHashMap<String, String>();
+            for (int i = 0; i < lines.length; i++) {
+                String raw = lines[i].replace("\r", "");
+                String code = firstCode(raw);
+                if (code == null) {
+                    others.add(raw);
+                } else if (!codeLine.containsKey(code)) {
+                    codeLine.put(code, raw);
+                }
+            }
+            List<String> out = new ArrayList<String>();
+            int oi = 0;
+            for (int i = 0; i < want.size(); i++) {
+                String raw = codeLine.get(want.get(i));
+                out.add(raw == null ? want.get(i) : raw);
+                if (oi < others.size()) {
+                    out.add(others.get(oi));
+                    oi++;
+                }
+            }
+            while (oi < others.size()) {
+                out.add(others.get(oi));
+                oi++;
+            }
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < out.size(); i++) {
+                sb.append(out.get(i)).append('\n');
+            }
+            writeText(f, sb.toString());
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     public static List<String> readCodes(Context c) {
@@ -210,7 +497,8 @@ public final class MapImporter {
         return out;
     }
 
-    private static String firstCode(String line) {
+    /** Code of one code-table line, or null when the line carries none. */
+    public static String firstCode(String line) {
         if (line == null) {
             return null;
         }
@@ -253,6 +541,9 @@ public final class MapImporter {
             String text = f.isFile() ? readText(new FileInputStream(f)) : "";
             if (containsToken(text, code)) {
                 return true;
+            }
+            if (loadCount(c) >= MAX_LOAD) {
+                return false;
             }
             StringBuilder sb = new StringBuilder(text);
             if (sb.length() > 0 && sb.charAt(sb.length() - 1) != '\n') {
@@ -303,54 +594,58 @@ public final class MapImporter {
         return m.find();
     }
 
-    public static boolean moveCode(Context c, String code, int delta) {
-        if (code == null || code.length() != 4 || delta == 0) {
-            return false;
+    /**
+     * Preview image of a map folder: <CODE>-map.jpg first, then any image whose name
+     * contains "map", then any image. Null when the folder has no image.
+     */
+    public static File mapImage(File dir, String code) {
+        if (dir == null || !dir.isDirectory()) {
+            return null;
         }
-        code = code.toUpperCase(Locale.US);
-        File f = codesFile(c);
-        if (f == null || !f.isFile()) {
-            return false;
+        String up = upper(code);
+        if (up.length() > 0) {
+            File f = new File(dir, up + "-map.jpg");
+            if (f.isFile()) {
+                return f;
+            }
         }
-        try {
-            String[] lines = readText(new FileInputStream(f)).split("\n", -1);
-            int at = -1;
-            for (int i = 0; i < lines.length; i++) {
-                String cd = firstCode(lines[i].replace("\r", ""));
-                if (cd != null && cd.equals(code)) {
-                    at = i;
-                    break;
+        File[] kids = dir.listFiles();
+        if (kids == null) {
+            return null;
+        }
+        Arrays.sort(kids, new Comparator<File>() {
+            public int compare(File a, File b) {
+                return a.getName().compareToIgnoreCase(b.getName());
+            }
+        });
+        File any = null;
+        File named = null;
+        File prefixed = null;
+        for (int i = 0; i < kids.length; i++) {
+            File k = kids[i];
+            if (!k.isFile()) {
+                continue;
+            }
+            String n = k.getName().toLowerCase(Locale.US);
+            if (n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png")) {
+                if (any == null) {
+                    any = k;
+                }
+                if (n.contains("map")) {
+                    if (named == null) {
+                        named = k;
+                    }
+                    if (up.length() > 0 && n.startsWith(up.toLowerCase(Locale.US))) {
+                        prefixed = k;
+                        break;
+                    }
                 }
             }
-            if (at < 0) {
-                return false;
-            }
-            int step = delta < 0 ? -1 : 1;
-            int other = -1;
-            for (int i = at + step; i >= 0 && i < lines.length; i += step) {
-                if (firstCode(lines[i].replace("\r", "")) != null) {
-                    other = i;
-                    break;
-                }
-            }
-            if (other < 0) {
-                return false;
-            }
-            String swap = lines[at];
-            lines[at] = lines[other];
-            lines[other] = swap;
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < lines.length; i++) {
-                if (i > 0) {
-                    sb.append('\n');
-                }
-                sb.append(lines[i]);
-            }
-            writeText(f, sb.toString());
-            return true;
-        } catch (Throwable t) {
-            return false;
         }
+        if (prefixed != null) {
+            return prefixed;
+        }
+        return named != null ? named : any;
     }
 
     public static String importZip(Context c, InputStream in, String zipName) {
@@ -392,8 +687,8 @@ public final class MapImporter {
                 copyTree(content, dst);
             }
             deleteTree(tmp);
-            registerCode(c, code);
-            LogStore.event(c, "map import " + zipName + " -> " + code);
+            boolean on = registerCode(c, code);
+            LogStore.event(c, "map import " + zipName + " -> " + code + (on ? "" : " (load list full)"));
             return "ok:" + code;
         } catch (Throwable t) {
             deleteTree(tmp);

@@ -1,7 +1,17 @@
-"""Write the ffm_* strings of the l10n_*.py data into work/v35/res/values*/ffm_strings.xml.
-A locale that misses a key falls back to the English resource.
+# -*- coding: utf-8 -*-
+"""Generate the manager strings from the l10n_*.py tables into the apktool project.
 
-Usage: python gen_l10n.py"""
+Usage:
+    python tools/gen_l10n.py
+
+Output:
+    work/v35/res/values/ffm_strings.xml            <- English (default, all keys)
+    work/v35/res/values-<locale>/ffm_strings.xml   <- one file per language (missing keys fall back to English)
+
+Only new files are written; the existing res/values*/strings.xml of the original APK is
+left alone. work/v35/res/values/public.xml already exists, so aapt2 keeps the existing
+resource ids and the new strings get new ones.
+"""
 
 import os
 import re
@@ -14,34 +24,49 @@ RES = os.path.join(ROOT, "work", "v35", "res")
 SRC = os.path.join(ROOT, "src")
 
 sys.path.insert(0, HERE)
-from l10n_data import EN, EN_KEYS, T
-from l10n_extra import EN_EXTRA, T_EXTRA
-from l10n_round3 import EN_R3, T_R3
-from l10n_round4 import EN_R4, T_R4
+from l10n_data import EN, EN_KEYS, T  # noqa: E402
+from l10n_extra import EN_EXTRA, T_EXTRA  # noqa: E402
+from l10n_round3 import EN_R3, T_R3  # noqa: E402
+from l10n_round4 import EN_R4, T_R4  # noqa: E402
+from l10n_round5 import EN_R5, T_R5  # noqa: E402
 
+# Round 2 keys (language switching / custom maps / merged main menu) are merged here so
+# the 79 KB l10n_data.py does not have to be edited.
 EN = list(EN) + list(EN_EXTRA)
 EN_KEYS = [k for k, _v in EN]
 for _loc, _d in T_EXTRA.items():
     T.setdefault(_loc, {}).update(_d)
 
+# Round 3 keys (the real UI rewrite).
 EN = list(EN) + list(EN_R3)
 EN_KEYS = [k for k, _v in EN]
 for _loc, _d in T_R3.items():
     T.setdefault(_loc, {}).update(_d)
 
+# Round 4 keys (one scrolling list / search / numbering / jump).
 EN = list(EN) + list(EN_R4)
 EN_KEYS = [k for k, _v in EN]
 for _loc, _d in T_R4.items():
     T.setdefault(_loc, {}).update(_d)
 
+# Round 5: no new English key, it only completes languages that covered part of the keys
+# (EN_R5 is empty).
+EN = list(EN) + list(EN_R5)
+EN_KEYS = [k for k, _v in EN]
+for _loc, _d in T_R5.items():
+    T.setdefault(_loc, {}).update(_d)
+
+# Resource name validity: ffm_<key> must be lower-case letters/digits/underscore
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
 
 def android_escape(v):
     """Escape for aapt2's <string> syntax.
 
-    aapt2 treats the apostrophe as a syntax character: an unescaped ' fails outright with
+    aapt2 treats an apostrophe as a syntax character: an unescaped ' fails the build with
     `error: unescaped apostrophe in string` (French/Italian/Turkish all hit this).
-    A backslash is itself an escape prefix, so it must be escaped first; a leading @ or ? is treated as a resource reference.
+    A backslash is itself an escape prefix, so it has to be escaped first; a leading
+    @ or ? would be read as a resource reference.
     """
     v = v.replace("\\", "\\\\")
     v = v.replace("'", "\\'")
@@ -50,6 +75,7 @@ def android_escape(v):
     if v[:1] in ("@", "?"):
         v = "\\" + v
     return escape(v)
+
 
 def xml_file(path, items):
     lines = ['<?xml version="1.0" encoding="utf-8"?>',
@@ -62,8 +88,9 @@ def xml_file(path, items):
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines))
 
+
 def java_keys():
-    """Scan the Java sources for literal t("key") / t("key", ...) key names."""
+    """Collect the literal keys of every t("key") / t("key", ...) call in the Java sources."""
     found = set()
     pat = re.compile(r'\bt\(\s*"([a-zA-Z0-9_]+)"')
     for dirpath, _dirs, files in os.walk(SRC):
@@ -74,6 +101,7 @@ def java_keys():
                 found.update(pat.findall(f.read()))
     return found
 
+
 def main():
     errors = []
     for k in EN_KEYS:
@@ -82,15 +110,17 @@ def main():
     if len(set(EN_KEYS)) != len(EN_KEYS):
         errors.append("duplicate key in EN")
 
+    # Data integrity: a language may only carry keys that exist in EN
     for loc, d in T.items():
         for k in d:
             if k not in EN_KEYS:
-                errors.append("%s uses a key that does not exist in EN: %s" % (loc, k))
+                errors.append("%s uses a key that is not in EN: %s" % (loc, k))
 
+    # Every key used by Java must be defined
     used = java_keys()
     for k in sorted(used):
         if k not in EN_KEYS:
-            errors.append("key used by Java but undefined in EN: %s" % k)
+            errors.append("used by Java but not defined in EN: %s" % k)
 
     if errors:
         print("validation failed:")
@@ -112,9 +142,10 @@ def main():
         rows.append((loc, len(d)))
         print("values-%-16s %3d/%3d keys" % (loc, len(d), total))
 
-    print("\nlanguage count: %d (+ default English)" % len(rows))
+    print("\nlanguages: %d (+ default English)" % len(rows))
     print("keys actually referenced by Java: %d, all covered" % len(used))
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

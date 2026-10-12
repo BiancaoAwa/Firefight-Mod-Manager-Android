@@ -12,7 +12,7 @@ here.
 | `build.ps1` | The 8-step build: localisation -> compile -> d8 -> apktool rebuild -> dex injection -> align and sign |
 | `verify_apk.ps1` | Static verification G1-G9; prints `RESULT: PASS` and exits 0 when everything passes |
 | `smoke_test.ps1` | On-device smoke test: `adb install -r` -> launch -> screenshot -> collect logcat/crash/directory listing |
-| `gen_l10n.py` | Merges the three string tables, writes `res/values*/ffm_strings.xml`, validates the keys |
+| `gen_l10n.py` | Merges the five string tables, writes `res/values*/ffm_strings.xml`, validates the keys |
 | `patch_worktree.py` | Idempotent worktree patches (manifest + sample mods + removing the old MyGame.smali) |
 | `inject_dex.py` | Appends `classes.dex` to the APK as `classes4.dex` (never rewrites existing entries) |
 | `verify_apk.py` | The zip-level check behind G2 (dex count, whether `.so` is still `stored`) |
@@ -69,11 +69,11 @@ exits; it never fails halfway through.
 ```
 [0/8] checking toolchain ...    JDK / android.jar / build-tools / apktool / python
 [1/8] generating res/values*/ffm_strings.xml    languages: 28 (+ default English)
-                                                keys actually referenced by Java: 74, all covered
+                                                keys actually referenced by Java: 83, all covered
 [2/8] backing up and removing the old MyGame.smali   backup -> core/backup/MyGame.smali.orig (48557 bytes)
 [3/8] javac stub classes (SDLActivity)
-[4/8] javac manager sources                     class files: 33
-[5/8] d8 -> classes.dex                         classes.dex: ~65000 bytes
+[4/8] javac manager sources                     class files: 61
+[5/8] d8 -> classes.dex                         classes.dex: ~90000 bytes
 [6/8] apktool rebuild of the worktree           unsigned.apk: ~259 MB
 [7/8] injecting classes4.dex (append-only)      classes4.dex stored / stored-so-violations: 0
 [8/8] zipalign + apksigner                      signed: out\...apk (~260 MB)
@@ -96,20 +96,19 @@ The `verify_apk.ps1` gates:
 
 ## 5. Changing strings / adding a language
 
-1. Add the key and its translations in `core/tools/l10n_round4.py` (the newest round; older keys
-   live in `l10n_round3.py` / `l10n_extra.py` / `l10n_data.py`);
+1. Add the key and its translations in `core/tools/l10n_round5.py` (the newest round; older keys
+   live in `l10n_round4.py` / `l10n_round3.py` / `l10n_extra.py` / `l10n_data.py`);
 2. Reference it from Java with `t("ffm_mm_your_key")`;
 3. Run `build.ps1` -- `gen_l10n.py` validates both "used by Java but undefined" and
    "defined but misspelled" keys, and aborts if anything is wrong.
 
-Adding a language: add the locale to the language table in `gen_l10n.py` and add that
-language's dict to the three data tables; missing keys fall back to English automatically
-(the build log prints coverage hints such as `values-<locale> 43/186 keys`).
+Adding a language: add that language's dict to `l10n_round5.py` (or to the round that introduces
+the keys); missing keys fall back to English automatically (the build log prints coverage hints
+such as `values-<locale> 43/201 keys`).
 
-> Current state: of the 28 languages, 10 are "complete" (186 keys, missing only the long
-> dead legacy key `about_github`), while the other 18 were only translated for the first
-> round's 43 keys in an early version and fall back to English for everything else. To
-> complete a language, just add keys to the corresponding data table.
+> Current state: all 28 languages cover all 201 keys (`gen_l10n.py` prints `201/201` for each of
+> them). A few of the older translations were produced by an early automated pass and have not
+> been proof-read by native speakers.
 
 ## 6. Common problems
 

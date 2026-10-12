@@ -53,7 +53,7 @@ pwsh -File core/tools/prepare_work.ps1 -GameApk <你的交战 APK>
 | 你要加的东西 | 放哪 |
 | --- | --- |
 | 管理器的一个新界面 / 逻辑 | `core/src/com/windowsgames/firefight/`，需要的话在 `ModManagerActivity` 里挂事件 |
-| 一句新文案 | `core/tools/l10n_round4.py`（最新一份数据表），键名 `ffm_mm_*` |
+| 一句新文案 | `core/tools/l10n_round5.py`（最新一份数据表），键名 `ffm_mm_*` |
 | 一个新的构建/验证步骤 | `core/tools/`，PowerShell 脚本引 `common.ps1` 取路径与工具链 |
 | 一份说明 | `docs/`，并在 `README.md` 的文档表里加一行 |
 | 随包的示例数据 | `core/assets/`（会被 `patch_worktree.py` 同步进工作树） |

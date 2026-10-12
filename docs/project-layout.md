@@ -55,7 +55,7 @@ mods, removal of the old smali) are applied idempotently by `patch_worktree.py`.
 | What you are adding | Where |
 | --- | --- |
 | A new manager screen / logic | `core/src/com/windowsgames/firefight/`, wire events in `ModManagerActivity` if needed |
-| A new UI string | `core/tools/l10n_round4.py` (the newest table), key name `ffm_mm_*` |
+| A new UI string | `core/tools/l10n_round5.py` (the newest table), key name `ffm_mm_*` |
 | A new build/verification step | `core/tools/`, PowerShell scripts take paths and toolchain from `common.ps1` |
 | A document | `docs/` (and `docs/zh-CN/`), plus a row in the README documentation table |
 | Sample data shipped in the package | `core/assets/` (synced into the worktree by `patch_worktree.py`) |
