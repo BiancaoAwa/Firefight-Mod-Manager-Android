@@ -1,6 +1,7 @@
 package com.windowsgames.firefight;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
@@ -30,37 +31,45 @@ final class Ui {
         return (int) (v * c.getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    static int color(Context c, int attr, int fallback) {
-        try {
-            TypedValue tv = new TypedValue();
-            if (c.getTheme().resolveAttribute(attr, tv, true)
-                    && tv.type >= TypedValue.TYPE_FIRST_COLOR_INT
-                    && tv.type <= TypedValue.TYPE_LAST_COLOR_INT) {
-                return tv.data;
-            }
-        } catch (Throwable ignored) {
+    /**
+     * Palette for one mode: background, card, primary text, secondary text, accent.
+     * The manager is grey and white unless the system is in night mode.
+     */
+    static int[] palette(boolean night) {
+        if (night) {
+            return new int[]{0xFF101214, 0xFF1C2024, 0xFFECEFF1, 0xFF9AA0A6, 0xFF4C9BE8};
         }
-        return fallback;
+        return new int[]{0xFFF2F3F5, 0xFFFFFFFF, 0xFF1F2328, 0xFF6B7280, 0xFF4B5563};
+    }
+
+    /** True when the system asks for the night mode. */
+    static boolean night(Context c) {
+        try {
+            int mode = c.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+            return mode == Configuration.UI_MODE_NIGHT_YES;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     static int bg(Context c) {
-        return color(c, android.R.attr.colorBackground, 0xFF101214);
+        return palette(night(c))[0];
     }
 
     static int cardColor(Context c) {
-        return color(c, android.R.attr.colorBackgroundFloating, 0xFF1C2024);
+        return palette(night(c))[1];
     }
 
     static int primary(Context c) {
-        return color(c, android.R.attr.textColorPrimary, 0xFFECEFF1);
+        return palette(night(c))[2];
     }
 
     static int secondary(Context c) {
-        return color(c, android.R.attr.textColorSecondary, 0xFF9AA0A6);
+        return palette(night(c))[3];
     }
 
     static int accent(Context c) {
-        return color(c, android.R.attr.colorAccent, 0xFF4C9BE8);
+        return palette(night(c))[4];
     }
 
     private static int faded(Context c, int alpha) {
@@ -154,6 +163,9 @@ final class Ui {
         b.setText(s == null ? "" : s);
         b.setAllCaps(false);
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+        // The manager paints its own surfaces, so buttons do not rely on the game theme.
+        b.setTextColor(primary(c));
+        b.setBackground(cardBg(c));
         return b;
     }
 

@@ -29,6 +29,7 @@ from l10n_extra import EN_EXTRA, T_EXTRA  # noqa: E402
 from l10n_round3 import EN_R3, T_R3  # noqa: E402
 from l10n_round4 import EN_R4, T_R4  # noqa: E402
 from l10n_round5 import EN_R5, T_R5  # noqa: E402
+from l10n_round6 import EN_R6, T_R6  # noqa: E402
 
 # Round 2 keys (language switching / custom maps / merged main menu) are merged here so
 # the 79 KB l10n_data.py does not have to be edited.
@@ -54,6 +55,12 @@ for _loc, _d in T_R4.items():
 EN = list(EN) + list(EN_R5)
 EN_KEYS = [k for k, _v in EN]
 for _loc, _d in T_R5.items():
+    T.setdefault(_loc, {}).update(_d)
+
+# Round 6 keys (about page rework / help text / the exit prompt).
+EN = list(EN) + list(EN_R6)
+EN_KEYS = [k for k, _v in EN]
+for _loc, _d in T_R6.items():
     T.setdefault(_loc, {}).update(_d)
 
 # Resource name validity: ffm_<key> must be lower-case letters/digits/underscore

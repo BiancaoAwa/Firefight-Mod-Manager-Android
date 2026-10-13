@@ -9,12 +9,16 @@ the mod directory and permissions are shared with the game.
 * On launch a prompt asks "use the mod manager?": "Yes" opens the manager, "No" or the
   15-second timeout goes straight into the game.
 * The manager has three tabs: **Mods** (enable / disable / delete / import),
-  **Maps** (import, enable / disable, thumbnails) and **About** (version, website,
-  repository, author).
+  **Maps** (import, enable / disable, thumbnails) and **About** (help, manager info,
+  game site, repository, author, licence).
+* The interface paints itself in a light or dark set of colours and follows the system
+  day/night setting.
 * Both lists are one continuous scrolling list with no cap on the number of mods or maps: a
   search box at the top filters by name, code or number, a "Jump" button scrolls to a given line,
   and every row has its own order number (and, for maps, an in-game load number) with up/down
   buttons and a "set the number" dialog.
+* Nothing asks for a restart while a change is made: leaving the manager through the `[Exit]`
+  button is what offers "restart the game now", "back to the manager" or "exit the game".
 * 28 UI languages, switchable from the title bar at any time, without affecting the game.
 * The manager is appended as an extra `classes4.dex`, so the existing dex files and the
   huge `.so` entries are never rewritten.
@@ -26,7 +30,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 pwsh -File core/tools/prepare_work.ps1 -GameApk "D:\APK\your-firefight.apk"  # decode + patch
 pwsh -File core/tools/build.ps1                                             # compile + inject + sign
 pwsh -File core/tools/verify_apk.ps1                                        # static verification
-adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.1.apk
+adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk
 ```
 
 `pwsh` in the examples is PowerShell 7; under Windows PowerShell 5.1 use `powershell -File` instead (both work).
@@ -89,7 +93,7 @@ the `name_zh` field of the sample mod, and the Chinese versions of the documents
 
 ## License
 
-GPL-3.0, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
 
 The manager code was written by this project's author; the Firefight game itself, the
 official packager and the official framework are copyright Windows Games Ltd. Before
