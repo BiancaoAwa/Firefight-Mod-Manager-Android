@@ -12,7 +12,7 @@ here.
 | `build.ps1` | The 8-step build: localisation -> compile -> d8 -> apktool rebuild -> dex injection -> align and sign |
 | `verify_apk.ps1` | Static verification G1-G9; prints `RESULT: PASS` and exits 0 when everything passes |
 | `smoke_test.ps1` | On-device smoke test: `adb install -r` -> launch -> screenshot -> collect logcat/crash/directory listing |
-| `gen_l10n.py` | Merges the five string tables, writes `res/values*/ffm_strings.xml`, validates the keys |
+| `gen_l10n.py` | Merges the six string tables, writes `res/values*/ffm_strings.xml`, validates the keys |
 | `patch_worktree.py` | Idempotent worktree patches (manifest + sample mods + removing the old MyGame.smali) |
 | `inject_dex.py` | Appends `classes.dex` to the APK as `classes4.dex` (never rewrites existing entries) |
 | `verify_apk.py` | The zip-level check behind G2 (dex count, whether `.so` is still `stored`) |
@@ -96,19 +96,19 @@ The `verify_apk.ps1` gates:
 
 ## 5. Changing strings / adding a language
 
-1. Add the key and its translations in `core/tools/l10n_round5.py` (the newest round; older keys
-   live in `l10n_round4.py` / `l10n_round3.py` / `l10n_extra.py` / `l10n_data.py`);
+1. Add the key and its translations in `core/tools/l10n_round6.py` (the newest round; older keys
+   live in `l10n_round5.py` / `l10n_round4.py` / `l10n_round3.py` / `l10n_extra.py` / `l10n_data.py`);
 2. Reference it from Java with `t("ffm_mm_your_key")`;
 3. Run `build.ps1` -- `gen_l10n.py` validates both "used by Java but undefined" and
    "defined but misspelled" keys, and aborts if anything is wrong.
 
-Adding a language: add that language's dict to `l10n_round5.py` (or to the round that introduces
+Adding a language: add that language's dict to `l10n_round6.py` (or to the round that introduces
 the keys); missing keys fall back to English automatically (the build log prints coverage hints
-such as `values-<locale> 43/201 keys`).
+such as `values-<locale> 43/216 keys`).
 
-> Current state: all 28 languages cover all 201 keys (`gen_l10n.py` prints `201/201` for each of
-> them). A few of the older translations were produced by an early automated pass and have not
-> been proof-read by native speakers.
+> Current state: all 28 languages cover all 216 keys (`gen_l10n.py` prints `216/216` for each of
+> them). The translations of the later rounds were produced automatically and have not been
+> proof-read by native speakers.
 
 ## 6. Common problems
 

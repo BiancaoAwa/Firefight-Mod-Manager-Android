@@ -8,12 +8,12 @@ into `classes4.dex` and appended to the game APK. All classes live in
 
 | Class | Size | Responsibility |
 | --- | --- | --- |
-| `MyGame` | ~170 lines | **The new launcher Activity**, `extends SDLActivity`. `onCreate` calls `super` first (the game initialises as usual) and then shows the prompt: "Yes" opens `ModManagerActivity`, "No" or the end of the `PROMPT_SECONDS = 15` countdown continues into the game. It also provides `rootOfStatic(Context)` -- the single "sandbox root" entry point of the whole project |
-| `ModManagerActivity` | ~1300 lines | The main manager screen (three tabs + title bar + version line + stats line) and the click dispatch centre for every button. Each list item carries its own `OnClickListener` closure instead of a page-local id range, so a list of any length works |
+| `MyGame` | ~150 lines | **The new launcher Activity**, `extends SDLActivity`. `onCreate` calls `super` first (the game initialises as usual) and then shows the prompt: "Yes" opens `ModManagerActivity`, "No" or the end of the `PROMPT_SECONDS = 15` countdown continues into the game. It also provides `rootOfStatic(Context)` -- the single "sandbox root" entry point of the whole project |
+| `ModManagerActivity` | ~1400 lines | The main manager screen (three tabs + title bar + version line + stats line) and the click dispatch centre for every button. Each list item carries its own `OnClickListener` closure instead of a page-local id range, so a list of any length works. The About tab opens six sub-pages (help, manager info, game site, repository, author, licence); leaving the manager runs the "restart needed" dialog when a change is still pending |
 | `ModImportActivity` | ~120 lines | A transparent/dialog-style Activity that receives `VIEW`/`SEND` of `application/zip`, hands the mod package to `ModImporter` and finishes |
 | `ModImporter` | ~1200 lines | All file logic for mods: `Mod/` holds the raw files of the one active mod (no `<id>/` level), inactive mods live in `Mod-disabled/<id>/` and the active id is recorded in `Mod-disabled/.ffm-enabled`; enabling a mod moves the previous one back into the library (one at a time). Also import (built-in assets / external zip / every directory that holds a `mod.txt` becomes one mod), backups, metadata and the display order file `Mod-disabled/.ffm-order` |
 | `MapImporter` | ~1000 lines | Custom maps: unpack into `Custom Maps/<CODE>/`, register `<CODE>` in `CustomMapCodeNames.txt` (listed = enabled, deleting the line = disabled, at most `MAX_LOAD = 27` listed), read `<name>` from `-scenarios`, and keep two orders -- the display order in `Custom Maps/.ffm-map-order` and the in-game load order as the sequence of listed codes. Also `mapImage()`, which finds the `<CODE>-map.jpg` thumbnail of a row |
-| `Ui` | ~260 lines | Widget factory and sizing helpers: `column/row/title/subtitle/action/headerAction/tabButton/divider/weight/fill/pad/dp/searchBox/mini/thumb/cardBgMarked/...`, all colours have fallbacks (a missing theme colour cannot crash it) |
+| `Ui` | ~270 lines | Widget factory and sizing helpers: `column/row/title/subtitle/action/headerAction/tabButton/divider/weight/fill/pad/dp/searchBox/mini/thumb/cardBgMarked/palette/...`, all colours have fallbacks (a missing theme colour cannot crash it). `palette()` holds the single light/dark colour decision of the manager |
 | `L10n` | ~210 lines | Language resolution: maps the system locale to one of 28 languages, `t()` reads from the generated `ffm_strings.xml` and falls back to English/the key name |
 | `LogStore` | ~220 lines | Diagnostics: appends events to `<Download>/Firefight-Mod-Manager/<package>/`, keeping the newest `MAX_FILES = 10`; "About -> Copy diagnostics" copies its contents |
 | `Perms` | ~55 lines | Permission helpers: check/request `MANAGE_EXTERNAL_STORAGE` |
@@ -33,7 +33,7 @@ The content view returned by `ModManagerActivity.buildRoot()` **is itself a full
 ScrollView (the window gives it EXACTLY full-screen height -> it measures the child with UNSPECIFIED)
 └── LinearLayout (padding 12,10,12,16 plus the window insets)
     ├── title Row: title (weight=1) + [Language] (headerAction) + [Back] (headerAction)
-    ├── version line: "0.1.1 (ffm-0.1.1)" in the small/faded style
+    ├── version line: "0.1.2 (ffm-0.1.2)" in the small/faded style
     ├── stats subtitle: installed mod count / total size
     ├── 10dp spacer
     ├── tab Row: [Mods][Maps][About] (each weight=1, ids 1/2/3)
@@ -88,20 +88,35 @@ The search row sits at the top of both lists: a permanently visible `EditText` t
 rows (name / code / number, case-insensitive) and a "Jump" button that asks for a line number,
 clears the filter, scrolls to that row and highlights it for two seconds.
 
-After a mod or map change the manager offers a "restart required" dialog whose "Restart now"
-button brings `MyGame` back up. Reordering alone does not ask for a restart on the Mods page,
-because the manager-side order is not an in-game order.
+No change asks for a restart while it is made: the manager only marks the session as dirty
+(`markDirty()`). The `[Exit]` button in the title bar then runs one dialog -- when nothing was
+changed it closes the manager immediately; when something was changed it offers "Restart the game
+now to apply the change" / "Back to the manager" / "Exit the game". "Exit the game" leaves the
+manager without restarting anything: the game re-reads its files on the next manual launch, and an
+automatic relaunch is what left the sound engine dead (see [history.md](history.md)).
+
+The manager paints itself. `Ui.palette(context)` picks a light or a dark set of colours from
+`Configuration.UI_MODE_NIGHT_MASK`, and every widget asks it for its colours, so no colour is
+taken from the game's theme and a missing theme colour cannot crash the manager.
+
+The About tab is a list of six entries -- help, manager info, game site, repository, author,
+licence -- and each one except the game site opens a sub-page inside the manager; the game site
+and the repository/author/licence links open in the browser or a viewer. The licence text is
+compiled in, so the page works offline.
 
 ## 3. Localisation
 
 * String keys all use the `ffm_` prefix; manager UI keys use `ffm_mm_*`.
-* The five Python data tables `core/tools/l10n_data.py` / `l10n_extra.py` /
-  `l10n_round3.py` / `l10n_round4.py` / `l10n_round5.py` are the **only** source of strings;
+* The six Python data tables `core/tools/l10n_data.py` / `l10n_extra.py` /
+  `l10n_round3.py` / `l10n_round4.py` / `l10n_round5.py` / `l10n_round6.py` are the **only**
+  source of strings;
   `core/tools/gen_l10n.py` merges them at build time and writes
   `core/work/v35/res/values*/ffm_strings.xml` (28 languages plus the default English).
-  Rounds 3 to 5 add keys on top of the first two tables, so a large data file does not have to be
+  Rounds 3 to 6 add keys on top of the first two tables, so a large data file does not have to be
   edited. `l10n_round5.py` adds no English key: it fills in the languages that previously covered
-  only part of the keys.
+  only part of the keys. `l10n_round6.py` carries the keys of 0.1.2 (about pages, licence, exit
+  dialog) and covers all 28 languages; the translations of the later rounds were produced
+  automatically and have not been proof-read by native speakers.
 * `gen_l10n.py` scans every `t("key")` in `core/src/**/*.java` and checks that each key is
   defined and that no language has extra keys; a missing key fails the build.
 * The UI language is decided by `L10n` and decoupled from the system language: switching

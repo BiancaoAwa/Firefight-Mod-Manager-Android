@@ -95,12 +95,12 @@ pwsh -File core/tools/build.ps1
 pwsh -File core/tools/verify_apk.ps1
 ```
 
-Artifact: `out/Firefight-Mod-Manager-13.2.0-mgr0.1.1.apk` (about 260 MB).
+Artifact: `out/Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk` (about 260 MB).
 
 Install it on a device:
 
 ```powershell
-adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.1.apk
+adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk
 ```
 
 If the device already has an app with the same package name but a different signature,

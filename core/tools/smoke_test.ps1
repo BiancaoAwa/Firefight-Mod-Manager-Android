@@ -16,7 +16,7 @@ if (-not $adb -or -not (Test-Path $adb)) {
     Write-Output "adb not found; install Android SDK platform-tools, or pass -AndroidSdk <sdk dir>"
     exit 1
 }
-if (-not $Apk) { $Apk = Join-Path $OutDir "Firefight-Mod-Manager-13.2.0-mgr0.1.1.apk" }
+if (-not $Apk) { $Apk = Join-Path $OutDir "Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk" }
 $pkg  = $Package
 $act  = "com.windowsgames.firefight.MyGame"
 $shot = Join-Path $RepoDir "shots"

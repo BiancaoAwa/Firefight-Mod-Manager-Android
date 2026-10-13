@@ -41,15 +41,36 @@ import java.util.Locale;
 
 public class ModManagerActivity extends Activity implements View.OnClickListener {
 
-    public static final String VERSION = "0.1.1";
-    public static final String BUILD = "ffm-0.1.1";
+    public static final String VERSION = "0.1.2";
+    public static final String BUILD = "ffm-0.1.2";
 
     private static final String URL_SITE = "http://www.windowsgames.co.uk/ff.html";
     private static final String URL_AUTHOR = "https://github.com/BiancaoAwa";
     private static final String URL_REPO = "https://github.com/BiancaoAwa/Firefight-Mod-Manager-Android";
+    private static final String URL_LICENSE = URL_REPO + "/blob/main/LICENSE";
     private static final String URL_BILI = "https://space.bilibili.com/1499437543";
     private static final String URL_AFDIAN = "https://afdian.com/a/bc_awa";
     private static final String URL_MAIL = "BC_awa@163.com";
+
+    /** Text shown on the licence page; the standard MIT wording, kept verbatim. */
+    private static final String MIT_TEXT =
+            "MIT License\n\n"
+            + "Copyright (c) 2026 BiancaoAwa\n\n"
+            + "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+            + "of this software and associated documentation files (the \"Software\"), to deal\n"
+            + "in the Software without restriction, including without limitation the rights\n"
+            + "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
+            + "copies of the Software, and to permit persons to whom the Software is\n"
+            + "furnished to do so, subject to the following conditions:\n\n"
+            + "The above copyright notice and this permission notice shall be included in all\n"
+            + "copies or substantial portions of the Software.\n\n"
+            + "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+            + "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+            + "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+            + "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+            + "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
+            + "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
+            + "SOFTWARE.";
 
     private static final int TAB_MODS = 0;
     private static final int TAB_MAPS = 1;
@@ -82,6 +103,22 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     private static final int ID_COPY = 29;
     private static final int ID_PERM = 30;
     private static final int ID_BILI = 31;
+    private static final int ID_HELP = 32;
+    private static final int ID_AUTHOR_PAGE = 33;
+    private static final int ID_LICENSE = 34;
+    private static final int ID_LICENSE_URL = 35;
+
+    private static final int ABOUT_MAIN = 0;
+    private static final int ABOUT_META = 1;
+    private static final int ABOUT_HELP = 2;
+    private static final int ABOUT_AUTHOR = 3;
+    private static final int ABOUT_LICENSE = 4;
+
+    /** Help lines, in the order they appear on the help page. */
+    private static final String[] HELP_KEYS = {
+        "mm_help_1", "mm_help_2", "mm_help_3", "mm_help_4",
+        "mm_help_5", "mm_help_6", "mm_help_7", "mm_help_8",
+    };
 
     private final Button[] tabs = new Button[3];
     private LinearLayout content;
@@ -96,7 +133,9 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     private int tab = TAB_MODS;
     private String modQuery = "";
     private String mapQuery = "";
-    private boolean metaOpen = false;
+    private int aboutPage = ABOUT_MAIN;
+    /** Set by every change that only takes effect after the game restarts. */
+    private boolean dirty = false;
     private boolean resumed = false;
 
     private List<ModImporter.Slot> slots = new ArrayList<ModImporter.Slot>();
@@ -144,8 +183,8 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     }
 
     public void onBackPressed() {
-        if (metaOpen) {
-            metaOpen = false;
+        if (aboutPage != ABOUT_MAIN) {
+            aboutPage = ABOUT_MAIN;
             showTab(TAB_ABOUT);
             return;
         }
@@ -153,10 +192,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
             showTab(TAB_MODS);
             return;
         }
-        try {
-            super.onBackPressed();
-        } catch (Throwable t) {
-        }
+        askExit();
     }
 
     private View buildRoot() {
@@ -188,7 +224,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         lang.setId(ID_LANG);
         lang.setOnClickListener(this);
         head.addView(lang);
-        Button back = Ui.headerAction(this, t("mm_back"));
+        Button back = Ui.headerAction(this, t("mm_exit_quit"));
         back.setId(ID_BACK);
         back.setOnClickListener(this);
         head.addView(back);
@@ -451,7 +487,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                         toast(ok ? t(on ? "mm_enable_ok" : "mm_disable_ok") : t("mm_op_failed"));
                         showTab(TAB_MODS);
                         if (ok) {
-                            promptRestart();
+                            markDirty();
                         }
                     }
                 });
@@ -469,7 +505,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                 toast(ok ? t("mm_deleted") : t("mm_del_failed"));
                 showTab(TAB_MODS);
                 if (ok) {
-                    promptRestart();
+                    markDirty();
                 }
             }
         });
@@ -687,7 +723,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         toast(ok ? t(on ? "mm_enable_ok" : "mm_disable_ok") : t("mm_op_failed"));
         showTab(TAB_MAPS);
         if (ok) {
-            promptRestart();
+            markDirty();
         }
     }
 
@@ -698,7 +734,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
         LogStore.event(this, "map " + e.code + " sort " + delta);
         showTab(TAB_MAPS);
-        promptRestart();
+        markDirty();
     }
 
     private void moveMapLoad(final MapImporter.MapEntry e, final int delta) {
@@ -708,7 +744,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
         LogStore.event(this, "map " + e.code + " load " + delta);
         showTab(TAB_MAPS);
-        promptRestart();
+        markDirty();
     }
 
     private void askMapNumber(final MapImporter.MapEntry e, int current) {
@@ -742,7 +778,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                 toast("ok".equals(r) ? t("mm_deleted") : t("mm_del_failed"));
                 showTab(TAB_MAPS);
                 if ("ok".equals(r)) {
-                    promptRestart();
+                    markDirty();
                 }
             }
         });
@@ -767,7 +803,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                                                         ? t("mm_deleted") : t("mm_del_failed"));
                                                 showTab(TAB_MAPS);
                                                 if ("ok".equals(r)) {
-                                                    promptRestart();
+                                                    markDirty();
                                                 }
                                             }
                                         });
@@ -806,19 +842,50 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
 
     private void showAbout() {
         content.removeAllViews();
-        if (metaOpen) {
+        if (aboutPage != ABOUT_MAIN) {
+            showAboutPage();
+            return;
+        }
+        setStat(VERSION + "  (" + BUILD + ")");
+        content.addView(infoRow(ID_HELP, t("mm_about_help"), t("mm_help_1")), cardLp());
+        content.addView(infoRow(ID_META, t("mm_about_meta"), VERSION + " / " + BUILD), cardLp());
+        content.addView(infoRow(ID_SITE, t("mm_about_site"), URL_SITE), cardLp());
+        content.addView(infoRow(ID_REPO, t("mm_about_repo"), URL_REPO), cardLp());
+        content.addView(infoRow(ID_AUTHOR_PAGE, t("mm_about_author_page"), URL_AUTHOR), cardLp());
+        content.addView(infoRow(ID_LICENSE, t("mm_about_license"), "MIT"), cardLp());
+    }
+
+    /** Sub-pages of the about tab: manager information, help, author links, licence. */
+    private void showAboutPage() {
+        if (aboutPage == ABOUT_META) {
             setStat(t("mm_meta_title"));
             showMetaRows();
             return;
         }
-        setStat(VERSION + "  (" + BUILD + ")");
-        content.addView(infoRow(ID_META, t("mm_about_meta"), VERSION + " / " + BUILD), cardLp());
-        content.addView(infoRow(ID_SITE, t("mm_about_site"), URL_SITE), cardLp());
-        content.addView(infoRow(ID_REPO, t("mm_about_repo"), URL_REPO), cardLp());
-        content.addView(infoRow(ID_AUTHOR, t("mm_about_author"), URL_AUTHOR), cardLp());
-        content.addView(infoRow(ID_BILI, t("mm_about_bili"), URL_BILI), cardLp());
-        content.addView(infoRow(ID_AFDIAN, t("mm_about_afdian"), URL_AFDIAN), cardLp());
-        content.addView(infoRow(ID_MAIL, t("mm_about_mail"), URL_MAIL), cardLp());
+        if (aboutPage == ABOUT_HELP) {
+            setStat(t("mm_about_help"));
+            for (int i = 0; i < HELP_KEYS.length; i++) {
+                TextView line = Ui.body(this, t(HELP_KEYS[i]));
+                LinearLayout.LayoutParams lp = Ui.fill();
+                lp.setMargins(0, Ui.dp(this, 8), 0, 0);
+                content.addView(line, lp);
+            }
+        } else if (aboutPage == ABOUT_AUTHOR) {
+            setStat(t("mm_about_author_page"));
+            content.addView(infoRow(ID_AUTHOR, t("mm_about_author"), URL_AUTHOR), cardLp());
+            content.addView(infoRow(ID_BILI, t("mm_about_bili"), URL_BILI), cardLp());
+            content.addView(infoRow(ID_AFDIAN, t("mm_about_afdian"), URL_AFDIAN), cardLp());
+            content.addView(Ui.small(this, t("mm_author_note")), cardLp());
+            content.addView(infoRow(ID_MAIL, t("mm_about_mail"), URL_MAIL), cardLp());
+        } else if (aboutPage == ABOUT_LICENSE) {
+            setStat(t("mm_about_license"));
+            TextView body = Ui.small(this, MIT_TEXT);
+            body.setTextIsSelectable(true);
+            content.addView(body, cardLp());
+            content.addView(infoRow(ID_LICENSE_URL, t("mm_about_repo"), URL_LICENSE), cardLp());
+        }
+        content.addView(Ui.spacer(this, 12));
+        content.addView(button(ID_META_BACK, t("mm_back")), Ui.fill());
     }
 
     private void showMetaRows() {
@@ -897,7 +964,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                                 d.dismiss();
                             } catch (Throwable t) {
                             }
-                            metaOpen = true;
+                            aboutPage = ABOUT_MAIN;
                             setContentView(buildRoot());
                             showTab(TAB_ABOUT);
                             settleLayout();
@@ -1007,7 +1074,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
         showTab(isMap ? TAB_MAPS : TAB_MODS);
         if (ok) {
-            promptRestart();
+            markDirty();
         }
     }
 
@@ -1026,21 +1093,30 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
     public void onClick(View v) {
         int id = v == null ? 0 : v.getId();
         if (id == ID_TAB_MODS) {
-            metaOpen = false;
+            aboutPage = ABOUT_MAIN;
             showTab(TAB_MODS);
         } else if (id == ID_TAB_MAPS) {
-            metaOpen = false;
+            aboutPage = ABOUT_MAIN;
             showTab(TAB_MAPS);
         } else if (id == ID_TAB_ABOUT) {
-            metaOpen = false;
+            aboutPage = ABOUT_MAIN;
             showTab(TAB_ABOUT);
-        } else if (id == ID_BACK || id == ID_META_BACK) {
-            if (id == ID_META_BACK) {
-                metaOpen = false;
-                showTab(TAB_ABOUT);
-            } else {
-                finish();
-            }
+        } else if (id == ID_META_BACK) {
+            aboutPage = ABOUT_MAIN;
+            showTab(TAB_ABOUT);
+        } else if (id == ID_BACK) {
+            askExit();
+        } else if (id == ID_HELP) {
+            aboutPage = ABOUT_HELP;
+            showTab(TAB_ABOUT);
+        } else if (id == ID_AUTHOR_PAGE) {
+            aboutPage = ABOUT_AUTHOR;
+            showTab(TAB_ABOUT);
+        } else if (id == ID_LICENSE) {
+            aboutPage = ABOUT_LICENSE;
+            showTab(TAB_ABOUT);
+        } else if (id == ID_LICENSE_URL) {
+            openUrl(URL_LICENSE);
         } else if (id == ID_IMPORT_MOD) {
             pick(REQ_PICK_MOD);
         } else if (id == ID_IMPORT_MAP) {
@@ -1054,7 +1130,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         } else if (id == ID_MAP_JUMP) {
             askJump(true);
         } else if (id == ID_META) {
-            metaOpen = true;
+            aboutPage = ABOUT_META;
             showTab(TAB_ABOUT);
         } else if (id == ID_LANG) {
             chooseLanguage();
@@ -1169,31 +1245,50 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         return L10n.t(this, key, key);
     }
 
-    private void promptRestart() {
+    /** Records a change that only takes effect once the game restarts. */
+    private void markDirty() {
+        dirty = true;
+    }
+
+    /** Exit action: leaves directly when nothing is pending, asks otherwise. */
+    private void askExit() {
+        if (!dirty) {
+            quitGame();
+            return;
+        }
         try {
             new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                    .setTitle(t("mm_restart_title"))
-                    .setMessage(t("mm_restart_msg"))
-                    .setPositiveButton(t("mm_restart_now"), new DialogInterface.OnClickListener() {
+                    .setTitle(t("mm_exit_title"))
+                    .setPositiveButton(t("mm_exit_quit"), new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface d, int which) {
-                            restartGame();
+                            quitGame();
                         }
                     })
-                    .setNegativeButton(t("mm_ok"), null)
+                    .setNegativeButton(t("mm_exit_stay"), null)
                     .show();
         } catch (Throwable t) {
-            toast(t("mm_restart_title"));
+            quitGame();
         }
     }
 
-    private void restartGame() {
+    /**
+     * Ends the game process instead of restarting the activity in place: restarting in place is
+     * what left the sound inoperative, so the user starts the game again from the launcher.
+     */
+    private void quitGame() {
         try {
-            Intent i = new Intent(this, MyGame.class);
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(i);
+            LogStore.event(this, "== manager " + VERSION + " quit ==");
         } catch (Throwable t) {
         }
-        finish();
+        try {
+            finishAffinity();
+        } catch (Throwable t) {
+            finish();
+        }
+        try {
+            android.os.Process.killProcess(android.os.Process.myPid());
+        } catch (Throwable t) {
+        }
     }
 
     private LinearLayout.LayoutParams cardLp() {

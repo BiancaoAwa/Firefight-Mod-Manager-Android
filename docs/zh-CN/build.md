@@ -11,7 +11,7 @@
 | `build.ps1` | 8 步构建：生成本地化 → 编译 → d8 → apktool 回编译 → 注入 dex → 对齐签名 |
 | `verify_apk.ps1` | 静态验证 G1–G9，全通过打印 `RESULT: PASS` 并以 0 退出 |
 | `smoke_test.ps1` | 上机冒烟：`adb install -r` → 启动 → 截图 → 抓 logcat/崩溃/目录清单 |
-| `gen_l10n.py` | 合并五份文案表，生成 `res/values*/ffm_strings.xml`，校验键 |
+| `gen_l10n.py` | 合并六份文案表，生成 `res/values*/ffm_strings.xml`，校验键 |
 | `patch_worktree.py` | 对工作树做幂等补丁（清单 + 示例模组 + 删旧 MyGame.smali） |
 | `inject_dex.py` | 把 `classes.dex` 以 `classes4.dex` 追加进 APK（不重写既有条目） |
 | `verify_apk.py` | G2 的 zip 层检查（dex 数量、`.so` 是否仍 stored） |
@@ -93,17 +93,17 @@ pwsh -File core/tools/verify_apk.ps1 [-Apk <file>] [-JdkHome <dir>] [-AndroidSdk
 
 ## 5. 改文案 / 加语言的流程
 
-1. 在 `core/tools/l10n_round5.py`（最新一轮；更早的键在 `l10n_round4.py` / `l10n_round3.py` /
-   `l10n_extra.py` / `l10n_data.py`）里加键和译文；
+1. 在 `core/tools/l10n_round6.py`（最新一轮；更早的键在 `l10n_round5.py` / `l10n_round4.py` /
+   `l10n_round3.py` / `l10n_extra.py` / `l10n_data.py`）里加键和译文；
 2. 在 Java 里用 `t("ffm_mm_你的键")` 引用；
 3. 跑 `build.ps1` —— `gen_l10n.py` 会校验「Java 用到但没定义」和「定义了却拼错」的键，
    不通过就中止。
 
-加语言：把该语种的字典加进 `l10n_round5.py`（或引入这些键的那一轮）；缺的键会自动回落英文
-（构建日志会打印 `values-<locale> 43/201 键` 这样的覆盖率提示）。
+加语言：把该语种的字典加进 `l10n_round6.py`（或引入这些键的那一轮）；缺的键会自动回落英文
+（构建日志会打印 `values-<locale> 43/216 键` 这样的覆盖率提示）。
 
-> 现状：28 个语种都已覆盖全部 201 个键（`gen_l10n.py` 对每个语种都打印 `201/201`）。
-> 其中一部分较早的译文由早期自动流程产生，尚未经母语者校对。
+> 现状：28 个语种都已覆盖全部 216 个键（`gen_l10n.py` 对每个语种都打印 `216/216`）。
+> 后面几轮的译文由自动流程产生，尚未经母语者校对。
 
 ## 6. 常见问题
 

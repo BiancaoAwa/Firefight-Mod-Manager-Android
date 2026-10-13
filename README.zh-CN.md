@@ -7,10 +7,13 @@
 
 * 启动时弹提示框「是否使用模组管理器」：选「是」进管理器，选「否」或 15 秒超时直接进游戏。
 * 管理器三个页签：**模组管理**（启用 / 禁用 / 删除 / 导入）、**地图管理**（导入、启用 / 禁用、
-  缩略图）、**关于管理器**（版本、官网、仓库、作者信息）。
+  缩略图）、**关于管理器**（使用帮助、管理器信息、游戏官网、仓库、作者、许可证）。
+* 界面自绘浅色 / 深色配色，跟随系统日夜模式。
 * 模组与地图都不再有数量上限，列表是一条连续的滚动列表：顶部搜索框按名称 / 代码 / 编号过滤，
   「跳转」按钮滚动到指定行，每一行都有排序编号（地图另有游戏内加载编号），带上下移动按钮与
   「设置编号」弹窗。
+* 更改时不再弹重启提示：从标题栏 `[退出]` 离开管理器时才提示「立即重启游戏完成更改」/
+  「返回管理器」/「退出游戏」。
 * 界面语言 28 种，可随时在标题栏切换，游戏本体不受影响。
 * 管理器以额外的 `classes4.dex` 追加进 APK，原有的 dex 与体积巨大的 `.so` 条目不重写。
 
@@ -21,7 +24,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 pwsh -File core/tools/prepare_work.ps1 -GameApk "D:\APK\你的交战.apk"   # 反编译 + 打补丁
 pwsh -File core/tools/build.ps1                                        # 编译 + 注入 + 签名
 pwsh -File core/tools/verify_apk.ps1                                   # 静态验证
-adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.1.apk
+adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk
 ```
 
 （示例里的 `pwsh` 指 PowerShell 7；只有 Windows PowerShell 5.1 时把 `pwsh` 换成 `powershell`，两者都能跑。）
@@ -79,7 +82,7 @@ docs/                 # 文档
 
 ## 许可
 
-GPL-3.0，见 [LICENSE](LICENSE)。
+MIT，见 [LICENSE](LICENSE)。
 
 管理器代码由本项目作者编写；交战（Firefight）游戏本体、官方打包器与官方框架的版权归
 Windows Games Ltd. 所有。发布打过管理器的整包前请自行确认你有权分发其中的游戏内容。

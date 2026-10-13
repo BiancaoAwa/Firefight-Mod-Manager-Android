@@ -280,6 +280,44 @@ by Java, all covered, and `201/201` for each of the 28 languages; `build.ps1` ->
 
 ---
 
+## Round 12: about sub-pages, MIT licence, own palette, exit dialog
+
+**Requests**: (1) the About tab becomes six entries -- manager help, manager info, game site,
+repository, author, licence; (2) the licence becomes MIT; (3) the interface becomes a grey/white
+palette, with the text colours following it; (4) changes no longer raise a restart prompt: leaving
+the manager through the top-right exit asks "restart the game to apply the change / back to the
+manager / exit the game" instead.
+
+**Why the restart flow changed**: with the previous flow the manager restarted the game process
+itself right after a change, and that relaunch left the sound engine dead -- after a restart the
+game loaded no music and no sound effects. 0.1.2 therefore never restarts anything: a change only
+marks the session dirty, and the user closes the manager and opens the game again.
+
+**How it was done**:
+
+* `Ui`: `palette(context)` returns the light or dark colour set selected by
+  `Configuration.UI_MODE_NIGHT_MASK`, and every widget factory takes its colours from there; the
+  old lookup of the game's theme attributes is gone, so a missing theme colour can no longer
+  affect or crash the manager. Buttons are drawn as manager-coloured cards instead of platform
+  buttons.
+* `ModManagerActivity`: the About tab is a list of six rows; each row except the game site opens a
+  sub-page inside the manager (`showAboutPage`). The licence text is compiled into the dex as a
+  constant, so the page works offline. `markDirty()` replaces the per-change restart prompt;
+  `onBackPressed()` and the header `[Exit]` button both run `askExit()`, which closes the manager
+  at once when nothing changed and otherwise offers restart / back to the manager / exit the game.
+* Localisation: `l10n_round6.py` carries the 0.1.2 keys (about pages, licence, exit dialog) in all
+  28 languages, so every language covers all 216 keys.
+* Licence: `LICENSE` is the MIT text (the previous GPL-3.0 text stays in the git history).
+* Version: the manager reports 0.1.2; every other version number (package `versionCode 13200`,
+  game version 13.2.0) is unchanged.
+
+**Result**: 61 class files, `classes4.dex` 94100 bytes, `gen_l10n.py` reports 88 keys referenced
+by Java, all covered, and `216/216` for each of the 28 languages; `build.ps1` -> `BUILD OK`,
+`verify_apk.ps1` -> `RESULT: PASS` (G2..G9 all 0, 216 `ffm_` resource entries, `versionName`
+still 13.2.0). The 32 offline JVM checks pass.
+
+---
+
 ## Traps hit (quick reference)
 
 | Trap | Lesson |
