@@ -316,6 +316,45 @@ by Java, all covered, and `216/216` for each of the 28 languages; `build.ps1` ->
 `verify_apk.ps1` -> `RESULT: PASS` (G2..G9 all 0, 216 `ffm_` resource entries, `versionName`
 still 13.2.0). The 32 offline JVM checks pass.
 
+## Round 13: exit without a pending change, and two independent map orders
+
+**Requests**: (1) the header `[Exit]` button must not end the game when no change is pending --
+only closing the manager; (2) the display number and the load number of a map must be independent:
+changing the display number or moving a row up/down must leave the load number alone, and typing a
+load number N must move that map to position N.
+
+**What was wrong**:
+
+* `askExit()` called `quitGame()` on the no-change path, so closing the manager also killed the
+  game process.
+* `MapImporter.applyOrder()` rewrote `CustomMapCodeNames.txt` from the display order on every
+  display-order change, so the display number and the load number were the same order: moving one
+  row renumbered the load order of every other map.
+* `setMapLoadIndex()` used `swapIn()`, exchanging the two positions instead of shifting the maps in
+  between, so the entered number was not where the map ended up.
+
+**How it was done**:
+
+* `ModManagerActivity.askExit()`: the no-change path logs the close and calls `finish()`, which
+  leaves the game running; the pending-change dialog keeps the two buttons (exit the game / back to
+  the manager). `markDirty()` is now called only for changes the game re-reads on its next launch
+  (enable, disable, delete, import, map load order); a display-order move no longer marks the
+  session.
+* `MapImporter`: `writeCodes(context, want)` writes the code table from an explicit order and is no
+  longer called from the display-order path; `moveMap()` / `setMapIndex()` write only
+  `.ffm-map-order`. The load-order path goes through the new pure function
+  `permuteList(all, present, code, to)`, which keeps the slots of listed codes, leaves codes
+  without a folder and non-code lines in place, and moves instead of exchanging; `permuteLoad()`
+  writes the display order out first, so the two orders stay apart.
+* The number dialog wraps the input field in a padded container, so the field no longer sits
+  against the dialog edge.
+* Version: the manager reports 0.1.3; every other version number (package `versionCode 13200`, game
+  version 13.2.0) is unchanged.
+
+**Result**: 35 offline JVM checks pass (new groups: `permuteList` and display-order freeze),
+`build.ps1` -> `BUILD OK`, `verify_apk.ps1` -> `RESULT: PASS` (G2..G9 all 0, 216 `ffm_` resource
+entries, `classes4.dex` 94192 bytes, `versionName` still 13.2.0).
+
 ---
 
 ## Traps hit (quick reference)
@@ -334,3 +373,5 @@ still 13.2.0). The 32 offline JVM checks pass.
 | Removing or translating comments with a naive text replacement | It also rewrites Python docstrings and Chinese text inside string literals (five tool files broke outright); use a parser (`tokenize`) or an explicit "line number -> full new line" map, then run `py_compile` |
 | Running a build script as a script block (`[scriptblock]::Create((Get-Content -Raw ...))`) | `$PSScriptRoot` is empty inside a script block, so the shared library is never loaded, the variables stay null and the script still prints a success banner; run scripts as files |
 | `& <script>.ps1` failing with `AuthorizationManager check failed` under PowerShell 5.1 | Use `powershell -NoProfile -ExecutionPolicy Bypass -File <script>` |
+| Two orders written by one function | When one stored order is derived from another on every write, the two can never be reordered independently; give each order its own writer |
+| "Move to position N" implemented with a swap | A swap only exchanges two entries; entering a position needs `list.add(to, list.remove(from))` |

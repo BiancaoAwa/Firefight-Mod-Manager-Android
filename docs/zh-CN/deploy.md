@@ -86,12 +86,12 @@ pwsh -File core/tools/build.ps1
 pwsh -File core/tools/verify_apk.ps1
 ```
 
-产物：`out/Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk`（约 260 MB）。
+产物：`out/Firefight-Mod-Manager-13.2.0-mgr0.1.3.apk`（约 260 MB）。
 
 安装到设备：
 
 ```powershell
-adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk
+adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.3.apk
 ```
 
 如果设备上已经装了别的签名的同包名 App，`adb install -r` 会报

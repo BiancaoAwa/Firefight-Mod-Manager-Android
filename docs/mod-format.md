@@ -141,12 +141,15 @@ The code table is the switch, but the order is kept by the manager:
 * at most **27 codes** may be listed (`MapImporter.MAX_LOAD`); enabling one more is refused
   with a message instead of growing the file;
 * the **display order** of all maps lives in `<base>/Custom Maps/.ffm-map-order` (one code per
-  line), so even maps that are not enabled can be arranged; the manager rewrites
-  `CustomMapCodeNames.txt` from that order, keeping comment and blank lines in their relative
-  positions;
+  line), so even maps that are not enabled can be arranged; the display order is the manager's
+  own list order and does not reach the game;
 * the **line order of the listed codes in `CustomMapCodeNames.txt` is the load order in the
   game**, and the manager shows it as the per-row "load number" with its own up/down buttons.
-  Maps that are not listed have no load number.
+  Maps that are not listed have no load number;
+* the two orders are independent. Moving a map in the display order or changing its display
+  number only rewrites `.ffm-map-order`; moving a map in the load order or changing its load
+  number only permutes the code lines of `CustomMapCodeNames.txt`, keeping comment and blank
+  lines in their relative positions.
 
 ### 2.3 Map packages
 

@@ -41,8 +41,8 @@ import java.util.Locale;
 
 public class ModManagerActivity extends Activity implements View.OnClickListener {
 
-    public static final String VERSION = "0.1.2";
-    public static final String BUILD = "ffm-0.1.2";
+    public static final String VERSION = "0.1.3";
+    public static final String BUILD = "ffm-0.1.3";
 
     private static final String URL_SITE = "http://www.windowsgames.co.uk/ff.html";
     private static final String URL_AUTHOR = "https://github.com/BiancaoAwa";
@@ -727,6 +727,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
     }
 
+    /** Moves one map in the manager list. The game reads the code table, not this order. */
     private void moveMap(final MapImporter.MapEntry e, final int delta) {
         if (e == null || !MapImporter.moveMap(this, e.code, delta)) {
             toast(t("mm_op_failed"));
@@ -734,7 +735,6 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         }
         LogStore.event(this, "map " + e.code + " sort " + delta);
         showTab(TAB_MAPS);
-        markDirty();
     }
 
     private void moveMapLoad(final MapImporter.MapEntry e, final int delta) {
@@ -1163,10 +1163,16 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         final EditText in = new EditText(this);
         in.setInputType(InputType.TYPE_CLASS_NUMBER);
         in.setText(String.valueOf(current));
+        in.setSingleLine(true);
+        in.setSelectAllOnFocus(true);
+        LinearLayout box = Ui.column(this);
+        int side = Ui.dp(this, 20);
+        box.setPadding(side, Ui.dp(this, 4), side, 0);
+        box.addView(in, Ui.fill());
         try {
             new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                     .setTitle(title)
-                    .setView(in)
+                    .setView(box)
                     .setPositiveButton(t("mm_ok"), new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface d, int which) {
                             int n;
@@ -1250,10 +1256,18 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
         dirty = true;
     }
 
-    /** Exit action: leaves directly when nothing is pending, asks otherwise. */
+    /**
+     * Exit action. Without a pending change only this activity closes and the game keeps
+     * running. With a pending change the change takes effect only after the game restarts,
+     * so the dialog offers the game exit and staying in the manager.
+     */
     private void askExit() {
         if (!dirty) {
-            quitGame();
+            try {
+                LogStore.event(this, "== manager " + VERSION + " close ==");
+            } catch (Throwable t) {
+            }
+            finish();
             return;
         }
         try {
@@ -1267,7 +1281,7 @@ public class ModManagerActivity extends Activity implements View.OnClickListener
                     .setNegativeButton(t("mm_exit_stay"), null)
                     .show();
         } catch (Throwable t) {
-            quitGame();
+            finish();
         }
     }
 

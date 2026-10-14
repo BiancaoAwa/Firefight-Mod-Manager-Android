@@ -11,7 +11,7 @@ param(
     [string]$KeyAlias = "",
     [string]$KeyPass = "",
     [string]$OutDir = "",
-    [string]$OutName = "Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk",
+    [string]$OutName = "Firefight-Mod-Manager-13.2.0-mgr0.1.3.apk",
     [switch]$NoSign
 )
 

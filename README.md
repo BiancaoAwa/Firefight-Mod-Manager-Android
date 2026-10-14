@@ -30,7 +30,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 pwsh -File core/tools/prepare_work.ps1 -GameApk "D:\APK\your-firefight.apk"  # decode + patch
 pwsh -File core/tools/build.ps1                                             # compile + inject + sign
 pwsh -File core/tools/verify_apk.ps1                                        # static verification
-adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk
+adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.3.apk
 ```
 
 `pwsh` in the examples is PowerShell 7; under Windows PowerShell 5.1 use `powershell -File` instead (both work).

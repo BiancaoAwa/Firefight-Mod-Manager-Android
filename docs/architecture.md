@@ -33,7 +33,7 @@ The content view returned by `ModManagerActivity.buildRoot()` **is itself a full
 ScrollView (the window gives it EXACTLY full-screen height -> it measures the child with UNSPECIFIED)
 └── LinearLayout (padding 12,10,12,16 plus the window insets)
     ├── title Row: title (weight=1) + [Language] (headerAction) + [Back] (headerAction)
-    ├── version line: "0.1.2 (ffm-0.1.2)" in the small/faded style
+    ├── version line: "0.1.3 (ffm-0.1.3)" in the small/faded style
     ├── stats subtitle: installed mod count / total size
     ├── 10dp spacer
     ├── tab Row: [Mods][Maps][About] (each weight=1, ids 1/2/3)
@@ -89,10 +89,12 @@ rows (name / code / number, case-insensitive) and a "Jump" button that asks for 
 clears the filter, scrolls to that row and highlights it for two seconds.
 
 No change asks for a restart while it is made: the manager only marks the session as dirty
-(`markDirty()`). The `[Exit]` button in the title bar then runs one dialog -- when nothing was
-changed it closes the manager immediately; when something was changed it offers "Restart the game
-now to apply the change" / "Back to the manager" / "Exit the game". "Exit the game" leaves the
-manager without restarting anything: the game re-reads its files on the next manual launch, and an
+(`markDirty()`), and only the changes the game re-reads on its next launch mark it (enable,
+disable, delete, import, and the map load order). The `[Exit]` button in the title bar then
+behaves in two ways: with no pending change it closes the manager and the game keeps running;
+with a pending change it offers "Restart the game now to apply the change" / "Back to the
+manager", and exits the game only when that is chosen. Leaving the game ends the manager process
+without restarting anything: the game re-reads its files on the next manual launch, and an
 automatic relaunch is what left the sound engine dead (see [history.md](history.md)).
 
 The manager paints itself. `Ui.palette(context)` picks a light or a dark set of colours from

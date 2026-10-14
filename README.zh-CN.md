@@ -24,7 +24,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 pwsh -File core/tools/prepare_work.ps1 -GameApk "D:\APK\你的交战.apk"   # 反编译 + 打补丁
 pwsh -File core/tools/build.ps1                                        # 编译 + 注入 + 签名
 pwsh -File core/tools/verify_apk.ps1                                   # 静态验证
-adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk
+adb install -r out\Firefight-Mod-Manager-13.2.0-mgr0.1.3.apk
 ```
 
 （示例里的 `pwsh` 指 PowerShell 7；只有 Windows PowerShell 5.1 时把 `pwsh` 换成 `powershell`，两者都能跑。）
