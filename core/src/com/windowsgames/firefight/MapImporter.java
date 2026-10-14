@@ -234,28 +234,6 @@ public final class MapImporter {
         }
     }
 
-    /** 0-based positions of the listed codes inside a display order. */
-    public static List<Integer> listedSlots(List<String> order, List<String> listed) {
-        List<Integer> out = new ArrayList<Integer>();
-        for (int i = 0; i < order.size(); i++) {
-            if (listed.contains(order.get(i))) {
-                out.add(Integer.valueOf(i));
-            }
-        }
-        return out;
-    }
-
-    /** Exchanges two elements of a list; false when a position is out of range. */
-    public static boolean swapIn(List<String> list, int a, int b) {
-        if (list == null || a < 0 || b < 0 || a >= list.size() || b >= list.size()) {
-            return false;
-        }
-        String tmp = list.get(a);
-        list.set(a, list.get(b));
-        list.set(b, tmp);
-        return true;
-    }
-
     /** Codes of folders that exist, in display order. */
     public static List<String> presentOrder(Context c) {
         List<MapEntry> all = listMaps(c);
@@ -306,10 +284,12 @@ public final class MapImporter {
         }
     }
 
-    /** Writes the display order and rebuilds the code table from it. */
-    private static boolean applyOrder(Context c, List<String> codes) {
+    /**
+     * Writes the display order. The code table is left alone: the display order and the
+     * load order are independent, so reordering the list must not renumber the maps.
+     */
+    private static void applyOrder(Context c, List<String> codes) {
         writeOrder(c, codes);
-        return syncCodes(c);
     }
 
     /** Moves one element inside a list; false when the move is a no-op or out of range. */
@@ -328,7 +308,8 @@ public final class MapImporter {
         if (!moveIn(order, at, at + delta)) {
             return false;
         }
-        return applyOrder(c, order);
+        applyOrder(c, order);
+        return true;
     }
 
     /** Moves one map to a 1-based display position. */
@@ -351,91 +332,122 @@ public final class MapImporter {
         if (!moveIn(order, at, to)) {
             return false;
         }
-        return applyOrder(c, order);
+        applyOrder(c, order);
+        return true;
+    }
+
+    /**
+     * Moves one listed map to a 1-based position among the listed maps. The code table
+     * carries that order; the display order is frozen first so it stays untouched.
+     */
+    public static boolean setMapLoadIndex(Context c, String code, int oneBased) {
+        return permuteLoad(c, code, oneBased - 1);
     }
 
     /**
      * Moves one listed map delta places among the listed maps, negative is up. Maps
-     * without a list entry keep their folder and are skipped.
+     * without a code-table line and codes without a folder keep their positions.
      */
     public static boolean moveMapLoad(Context c, String code, int delta) {
         if (delta == 0) {
             return false;
         }
-        List<String> order = presentOrder(c);
-        List<Integer> slots = listedSlots(order, readCodes(c));
-        int at = slots.indexOf(Integer.valueOf(order.indexOf(upper(code))));
-        int to = at + (delta < 0 ? -1 : 1);
-        if (at < 0 || to < 0 || to >= slots.size()) {
-            return false;
-        }
-        if (!swapIn(order, slots.get(at).intValue(), slots.get(to).intValue())) {
-            return false;
-        }
-        return applyOrder(c, order);
-    }
-
-    /** Moves one listed map to a 1-based position among the listed maps. */
-    public static boolean setMapLoadIndex(Context c, String code, int oneBased) {
-        List<String> order = presentOrder(c);
-        List<Integer> slots = listedSlots(order, readCodes(c));
-        int at = slots.indexOf(Integer.valueOf(order.indexOf(upper(code))));
+        List<String> seq = listedPresent(c);
+        int at = seq.indexOf(upper(code));
         if (at < 0) {
             return false;
         }
-        int to = oneBased - 1;
-        if (to < 0) {
-            to = 0;
-        }
-        if (to >= slots.size()) {
-            to = slots.size() - 1;
-        }
-        if (to == at) {
-            return false;
-        }
-        if (!swapIn(order, slots.get(at).intValue(), slots.get(to).intValue())) {
-            return false;
-        }
-        return applyOrder(c, order);
+        return permuteLoad(c, code, at + (delta < 0 ? -1 : 1));
     }
 
     /** 1-based position among the listed maps, -1 when the map is not listed. */
     public static int loadIndexOf(Context c, String code) {
-        List<String> order = presentOrder(c);
-        List<Integer> slots = listedSlots(order, readCodes(c));
-        int at = slots.indexOf(Integer.valueOf(order.indexOf(upper(code))));
+        int at = listedPresent(c).indexOf(upper(code));
         return at < 0 ? -1 : at + 1;
     }
 
     /** Number of listed maps that have a folder. */
     public static int loadCount(Context c) {
-        return listedSlots(presentOrder(c), readCodes(c)).size();
+        return listedPresent(c).size();
+    }
+
+    /** Codes of the code table that also have a folder, in code-table order. */
+    public static List<String> listedPresent(Context c) {
+        List<String> all = readCodes(c);
+        List<String> present = presentOrder(c);
+        List<String> out = new ArrayList<String>();
+        for (int i = 0; i < all.size(); i++) {
+            if (present.contains(all.get(i)) && !out.contains(all.get(i))) {
+                out.add(all.get(i));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Code-table order after moving one listed map to a 0-based position among the listed
+     * maps. Listed codes keep the slots they occupy, codes without a folder keep their
+     * lines, and the move shifts the codes in between. Null when nothing moves.
+     */
+    public static List<String> permuteList(List<String> all, List<String> present, String code, int to) {
+        List<Integer> slots = new ArrayList<Integer>();
+        List<String> seq = new ArrayList<String>();
+        for (int i = 0; i < all.size(); i++) {
+            String s = all.get(i);
+            if (present.contains(s) && !seq.contains(s)) {
+                slots.add(Integer.valueOf(i));
+                seq.add(s);
+            }
+        }
+        int at = seq.indexOf(upper(code));
+        if (at < 0) {
+            return null;
+        }
+        if (to < 0) {
+            to = 0;
+        }
+        if (to >= seq.size()) {
+            to = seq.size() - 1;
+        }
+        if (to == at || !moveIn(seq, at, to)) {
+            return null;
+        }
+        List<String> out = new ArrayList<String>(all);
+        for (int i = 0; i < slots.size(); i++) {
+            out.set(slots.get(i).intValue(), seq.get(i));
+        }
+        return out;
+    }
+
+    /**
+     * Moves one listed map to a 0-based position among the listed maps. Only the code-table
+     * lines move; the display order is written out unchanged first, so the two orders stay
+     * independent.
+     */
+    private static boolean permuteLoad(Context c, String code, int to) {
+        List<String> next = permuteList(readCodes(c), presentOrder(c), code, to);
+        if (next == null) {
+            return false;
+        }
+        writeOrder(c, presentOrder(c));
+        return writeCodes(c, next);
     }
 
     private static String upper(String code) {
         return code == null ? "" : code.toUpperCase(Locale.US);
     }
 
-    /** Rewrites the code table so its line order matches the display order. */
-    public static boolean syncCodes(Context c) {
+    /**
+     * Rewrites the code table with its code lines in the given order. Lines that carry no
+     * code keep their text and their relative position, and a code line keeps its original
+     * text. The order of these lines is the load order inside the game.
+     */
+    public static boolean writeCodes(Context c, List<String> want) {
         File f = codesFile(c);
         if (f == null) {
             return false;
         }
         try {
-            List<String> listed = readCodes(c);
-            List<String> want = new ArrayList<String>();
-            List<String> order = presentOrder(c);
-            for (int i = 0; i < order.size(); i++) {
-                if (listed.contains(order.get(i))) {
-                    want.add(order.get(i));
-                }
-            }
-            for (int i = 0; i < listed.size(); i++) {
-                if (!want.contains(listed.get(i))) {
-                    want.add(listed.get(i));
-                }
-            }
             String text = f.isFile() ? readText(new FileInputStream(f)) : "";
             String[] lines = text.split("\n", -1);
             List<String> others = new ArrayList<String>();

@@ -10,7 +10,7 @@ param(
 
 . "$PSScriptRoot\common.ps1"
 
-if (-not $Apk) { $Apk = Join-Path $OutDir "Firefight-Mod-Manager-13.2.0-mgr0.1.2.apk" }
+if (-not $Apk) { $Apk = Join-Path $OutDir "Firefight-Mod-Manager-13.2.0-mgr0.1.3.apk" }
 $resolved = Resolve-Path $Apk -ErrorAction SilentlyContinue
 if (-not $resolved) { Write-Output "APK does not exist; run build.ps1 first or pass -Apk"; exit 1 }
 $Apk = $resolved.Path

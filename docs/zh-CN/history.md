@@ -261,6 +261,27 @@ Python 走 `tokenize` 只删 `COMMENT`，PowerShell 逐行做引号感知），�
 
 ---
 
+## 第 13 轮：无改动退出不结束游戏、地图两种顺序解耦
+
+**需求**：（1）没有未生效改动时，标题栏 `[退出]` 不得结束游戏，只关闭管理器；（2）地图的显示编号与加载编号必须互相独立 —— 改显示编号或上下移动不得改变加载编号，输入加载编号 N 必须让该地图移动到第 N 位。
+
+**问题所在**：
+
+* `askExit()` 在「没有改动」分支上调用了 `quitGame()`，关闭管理器的同时也结束了游戏进程；
+* `MapImporter.applyOrder()` 每次显示顺序变化都按显示顺序重写 `CustomMapCodeNames.txt`，两种编号因此是同一个顺序：移动一行会把其它地图的加载顺序一起改号；
+* `setMapLoadIndex()` 用 `swapIn()` 交换两个位置而不是移动，输入的数字不是地图最终落到的位置。
+
+**改法**：
+
+* `ModManagerActivity.askExit()`：无改动分支记一条日志并调用 `finish()`，游戏继续运行；有改动的对话框保持两项（退出游戏 / 返回管理器）。`markDirty()` 只在游戏下次启动会重新读取的改动上调用（启用、禁用、删除、导入、地图加载顺序），显示顺序的移动不再标记。
+* `MapImporter`：新增 `writeCodes(context, want)` 按显式顺序写码表，显示顺序路径不再调用；`moveMap()` / `setMapIndex()` 只写 `.ffm-map-order`。加载顺序路径改走纯函数 `permuteList(all, present, code, to)`：已登记代码占用的行位不变、没有目录的代码与非代码行留在原位、语义是移动而非交换；`permuteLoad()` 先写一次显示顺序，两种顺序因此互不影响。
+* 改号弹窗的输入框包进带边距的容器，不再贴着对话框边缘。
+* 版本：管理器报 0.1.3；其它版本号（包 `versionCode 13200`、游戏版本 13.2.0）不变。
+
+**结果**：离线 JVM 用例 35 项全过（新增 `permuteList` 与显示顺序冻结两组），`build.ps1` → `BUILD OK`，`verify_apk.ps1` → `RESULT: PASS`（G2–G9 全 0，`ffm_` 资源 216 条，`classes4.dex` 94192 字节，`versionName` 仍为 13.2.0）。
+
+---
+
 ## 踩过的坑（速查）
 
 | 坑 | 教训 |
@@ -277,3 +298,5 @@ Python 走 `tokenize` 只删 `COMMENT`，PowerShell 逐行做引号感知），�
 | 用朴素文本替换「删注释 / 翻注释」 | 会把 Python docstring、字符串里的中文一起改掉（5 个工具文件直接语法崩）；必须用解析器（`tokenize`）或「显式行号 → 整行新文本」的映射，改完跑 `py_compile` |
 | 用 `[scriptblock]::Create((Get-Content -Raw ...))` 跑构建脚本 | scriptblock 里 `$PSScriptRoot` 为空，公共库不会被加载，变量全为 null，脚本却仍打印成功横幅；脚本要按文件执行 |
 | PowerShell 5.1 下 `& <脚本>.ps1` 报 `AuthorizationManager check failed` | 改用 `powershell -NoProfile -ExecutionPolicy Bypass -File <脚本>` |
+| 两种顺序由同一个函数写出 | 一个存储顺序每次都由另一个顺序派生时，两者永远无法独立调整；每种顺序要有各自的写入函数 |
+| 用交换实现「移动到第 N 位」 | 交换只动两个条目；输入位置需要 `list.add(to, list.remove(from))` |
